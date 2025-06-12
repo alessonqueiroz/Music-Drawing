@@ -11,6 +11,7 @@
     --bg-dark-accent: #110d21;
     --text-light: #f0f0f0;
     --text-dark: #c0c0c0;
+    --text-secondary: #888;
     --border-color-dark: rgba(169, 114, 255, 0.2);
     --play-btn-bg: var(--secondary-glow);
     --play-btn-hover: #8cbaff;
@@ -22,149 +23,146 @@
     --danger-glow: #e11d48;
     --bg-dark: #f9fafb;
     --bg-dark-glass: rgba(255, 255, 255, 0.3);
-    --bg-dark-sidebar: rgba(255, 255, 255, 0.1);
+    --bg-dark-sidebar: rgba(245, 245, 245, 0.8);
     --bg-dark-accent: #f3f4f6;
     --text-light: #1f2937;
     --text-dark: #4b5563;
+    --text-secondary: #525252;
     --border-color-dark: rgba(109, 40, 217, 0.3);
     --play-btn-bg: var(--secondary-glow);
     --play-btn-hover: #4f80ee;
 }
 
 /* ==========================================================================
-   2. Estilos Base
+   2. Estilos Base e de Seleção
    ========================================================================== */
-body {
-    background-color: var(--bg-dark);
-    color: var(--text-light);
-    font-family: 'Poppins', sans-serif;
-    transition: background-color 0.3s, color 0.3s;
-    overflow: hidden;
-}
+body { background-color: var(--bg-dark); color: var(--text-light); font-family: 'Poppins', sans-serif; transition: background-color 0.3s, color 0.3s; overflow: hidden; }
 .hidden { display: none !important; }
-
-/* ==========================================================================
-   3. Tela de Seleção
-   ========================================================================== */
 #selection-container { background-color: var(--bg-dark); }
 .background-animation { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
-.background-animation::before {
-    content: ''; position: absolute; width: 400px; height: 400px;
-    background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow));
-    border-radius: 50%; filter: blur(150px); opacity: 0.5;
-    animation: move-glow 15s linear infinite alternate;
-}
-@keyframes move-glow {
-    from { transform: translate(-10vw, -20vh) scale(1); }
-    to { transform: translate(60vw, 40vh) scale(1.2); }
-}
-.selection-box {
-    position: relative; z-index: 2; background: var(--bg-dark-glass);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border: 1px solid var(--border-color-dark);
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
+.background-animation::before { content: ''; position: absolute; width: 400px; height: 400px; background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow)); border-radius: 50%; filter: blur(150px); opacity: 0.5; animation: move-glow 15s linear infinite alternate; }
+@keyframes move-glow { from { transform: translate(-10vw, -20vh) scale(1); } to { transform: translate(60vw, 40vh) scale(1.2); } }
+.selection-box { position: relative; z-index: 2; background: var(--bg-dark-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-color-dark); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
 .selection-box h1 { text-shadow: 0 0 15px var(--primary-glow); }
-.mode-btn {
-    font-size: 1rem; font-weight: 400; cursor: pointer;
-    border: 1px solid var(--primary-glow); border-radius: 50px;
-    background-color: transparent; color: var(--text-light);
-    transition: all 0.3s ease; padding: 15px 35px;
-}
-.mode-btn:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow);
-    background-color: rgba(169, 114, 255, 0.1);
-}
+.mode-btn { font-size: 1rem; font-weight: 400; cursor: pointer; border: 1px solid var(--primary-glow); border-radius: 50px; background-color: transparent; color: var(--text-light); transition: all 0.3s ease; padding: 15px 35px; }
+.mode-btn:hover { transform: translateY(-3px); box-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow); background-color: rgba(169, 114, 255, 0.1); }
 
 /* ==========================================================================
-   4. Layout da Aplicação
+   4. Layout da Aplicação - CORRIGIDO
    ========================================================================== */
 .app-container {
     background: var(--bg-dark-accent);
     border: 1px solid var(--border-color-dark);
-    box-shadow: 0 500px 400px rgba(0,0,0,0.4);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    /* O contêiner principal agora é uma coluna flex, garantindo a distribuição vertical */
+    display: flex;
+    flex-direction: column;
 }
-header { border-color: var(--border-color-dark) !important; }
-aside { background-color: var(--bg-dark-sidebar); border-color: var(--border-color-dark) !important; }
+header { 
+    border-color: var(--border-color-dark) !important; 
+    flex-shrink: 0; /* Impede que o header encolha */
+}
+/* Este é o contêiner principal que segura a barra lateral e o canvas */
+.app-body {
+    display: flex;
+    flex-grow: 1;
+    min-height: 0; /* Essencial para que o 'overflow' funcione em filhos de containers flex */
+}
+
+aside { 
+    background-color: var(--bg-dark-sidebar); 
+    border-color: var(--border-color-dark) !important; 
+    flex-shrink: 0; /* Impede que a barra lateral encolha */
+}
+
+main#canvas-wrapper {
+    display: grid;
+    grid-template-areas:
+        "y-ruler main-canvas"
+        "corner x-ruler";
+    grid-template-rows: 1fr auto;
+    grid-template-columns: auto 1fr;
+    flex-grow: 1; /* Faz o <main> ocupar todo o espaço restante */
+    min-width: 0;  /* Essencial para conter o canvas largo */
+}
+
+#main-canvas-area {
+    grid-area: main-canvas;
+    position: relative;
+    overflow: auto;
+    min-width: 0;
+    min-height: 0;
+}
+
 .title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
 .subtitle-color { color: var(--text-dark); }
 .sidebar-title { font-weight: 600; text-align: center; margin-bottom: 0.75rem; color: var(--text-dark); }
-#drawingCanvas { background-color: var(--bg-dark); }
+.sidebar-section { background-color: rgba(128, 128, 128, 0.05); padding: 0.75rem; border-radius: 12px; }
 
 /* ==========================================================================
-   5. Componentes da Aplicação
+   5. Componentes e Playhead
    ========================================================================== */
-.tool-btn, .timbre-btn, .play-btn, .danger-btn {
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; padding: 8px; border-radius: 8px;
-    border: 1px solid transparent; background-color: rgba(169, 114, 255, 0.1);
-    color: var(--text-dark); font-weight: 500;
-    transition: all 0.2s ease; cursor: pointer;
-}
-.tool-btn:hover, .timbre-btn:hover, .danger-btn:hover {
-    color: var(--text-light); border-color: var(--primary-glow);
-    background-color: rgba(169, 114, 255, 0.2);
-}
-.tool-btn.active, .timbre-btn.active {
-    color: white; background-color: var(--primary-glow);
-    box-shadow: 0 0 10px var(--primary-glow);
-}
+.tool-btn, .timbre-btn, .play-btn, .danger-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; border-radius: 8px; border: 1px solid transparent; background-color: rgba(169, 114, 255, 0.1); color: var(--text-dark); font-weight: 500; transition: all 0.2s ease; cursor: pointer; }
+.tool-btn:hover, .timbre-btn:hover, .danger-btn:hover { color: var(--text-light); border-color: var(--primary-glow); background-color: rgba(169, 114, 255, 0.2); }
+.tool-btn.active, .timbre-btn.active { color: white; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); }
 .tool-btn.primary { background-color: var(--primary-glow); color: white; }
-.tool-btn.primary:hover { background-color: #c084fc; } /* Lighter purple */
-
+.tool-btn.primary:hover { background-color: #c084fc; }
 .play-btn { background-color: var(--play-btn-bg); color: white; padding: 8px 16px; font-weight: 600; }
 .play-btn:hover { background-color: var(--play-btn-hover); }
-
 .danger-btn { background-color: transparent; border: 1px solid var(--danger-glow); color: var(--danger-glow); }
 .danger-btn:hover { background-color: rgba(255, 114, 161, 0.1); box-shadow: 0 0 10px var(--danger-glow); }
-
 button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
-input[type="range"] { accent-color: var(--primary-glow); }
-input[type="color"] { width: 100%; height: 40px; border: 1px solid var(--border-color-dark); border-radius: 8px; cursor: pointer; }
+input[type="range"] { accent-color: var(--primary-glow); width: 100%;}
+input[type="color"] { width: 100%; height: 40px; border: 1px solid var(--border-color-dark); border-radius: 8px; cursor: pointer; background-color: transparent; }
 input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
-
-/* Dropdown */
 .dropdown { position: relative; }
 .dropdown-content { display: none; position: absolute; right: 0; background-color: var(--bg-dark-accent); min-width: 160px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3); z-index: 10; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color-dark); }
 .dropdown:hover .dropdown-content { display: block; }
 .dropdown-content button { color: var(--text-light); padding: 12px 16px; width: 100%; text-align: left; background: none; border: none; }
 .dropdown-content button:hover { background-color: rgba(169, 114, 255, 0.1); }
-
-/* Canvas e Rulers */
-#canvas-wrapper { grid-template-columns: 35px 1fr; grid-template-rows: 1fr 20px; }
-#playhead { width: 2px; background-color: var(--danger-glow); box-shadow: 0 0 10px var(--danger-glow); }
-
-/* Scrollbar */
+#y-ruler-container { grid-area: y-ruler; width: 50px; }
+#x-ruler-container { grid-area: x-ruler; height: 30px; overflow: hidden; }
+#canvas-container { position: relative; }
+#drawingCanvas, #y-ruler-canvas, #x-ruler-canvas { display: block; background-color: var(--bg-dark); }
+#y-ruler-canvas, #x-ruler-canvas { height: 100%; width: 100%; }
+#playhead { width: 2px; height: 100%; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); position: absolute; top: 0; left: 0; transform: translateX(0); }
 .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.2); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(169, 114, 255, 0.4); }
-
-/* Loader */
-#loading-overlay .loader { border-top-color: var(--primary-glow); }
+#loading-overlay .loader { width: 60px; height: 60px; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
    6. Responsividade (Mobile Mode)
    ========================================================================== */
-body.mobile-mode .app-container { flex-direction: column; height: 100%; }
-body.mobile-mode aside {
-    order: 2; width: 100%; height: auto;
-    flex-direction: row; flex-wrap: wrap; justify-content: center;
-    overflow-y: auto; max-height: 40vh; padding: 8px;
-    border-top: 1px solid var(--border-color-dark); border-right: none;
-}
-body.mobile-mode main { order: 1; padding: 0; height: 100%; }
-body.mobile-mode .sidebar-section {
-    padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1;
-    background-color: var(--bg-dark-sidebar);
-}
+body.mobile-mode .app-body { flex-direction: column; }
+body.mobile-mode aside { order: 2; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-between; overflow-y: auto; max-height: 50vh; padding: 8px; border-top: 1px solid var(--border-color-dark); border-right: none; }
+body.mobile-mode main#canvas-wrapper { order: 1; }
+body.mobile-mode .sidebar-section { padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1; min-width: 150px; background-color: var(--bg-dark-sidebar); }
 body.mobile-mode .sidebar-title { font-size: 0.8rem; }
-body.mobile-mode .tool-btn { height: 50px; width: 50px; font-size: 0.7rem; }
+body.mobile-mode .tool-btn { height: 50px; width: 100%; font-size: 0.7rem; flex-direction: row; }
+body.mobile-mode .tool-btn svg { width: 20px; height: 20px; }
+body.mobile-mode .tool-btn span { display: inline; }
 body.mobile-mode header { padding: 8px; flex-wrap: nowrap; }
 body.mobile-mode header h1 { font-size: 1rem; }
 body.mobile-mode header p, body.mobile-mode #exportBtn span { display: none; }
-body.mobile-mode .dropdown-content {
-    position: fixed; bottom: 0; left: 0; width: 100%;
-    border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
-}
+body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width: 100%; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); }
+body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 20px; grid-template-columns: 35px 1fr; }
+body.mobile-mode #y-ruler-container { width: 35px; }
+body.mobile-mode #x-ruler-container { height: 20px; }
+
+/*
+  --- MODO DE DEBUG ---
+  Se o problema de layout persistir, descomente o bloco de código abaixo.
+  Isso adicionará bordas coloridas aos principais contêineres para que você
+  possa ver o tamanho real que eles estão ocupando na tela com a ferramenta
+  de desenvolvedor do navegador (F12).
+*/
+/*
+.app-container { border: 2px solid orange; }
+.app-body { border: 2px solid yellow; }
+aside { border: 2px solid green; }
+main#canvas-wrapper { border: 2px solid blue; }
+#main-canvas-area { border: 2px solid purple; }
+*/

@@ -8,11 +8,10 @@ import { yFromFrequency } from './utils.js';
  */
 export function redrawAll() {
     const { ctx, drawingCanvas } = uiElements;
-    if (!ctx) return;
+    if (!ctx || !drawingCanvas || drawingCanvas.width === 0) return;
     
-    ctx.clearRect(50,50, drawingCanvas.width, drawingCanvas.height);
+    ctx.clearRect(0, 0, drawingCanvas.width, drawingCanvas.height);
 
-    // Desenha os traços (strokes)
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
         ctx.beginPath();
@@ -27,7 +26,6 @@ export function redrawAll() {
         ctx.stroke();
     });
 
-    // Desenha os símbolos
     state.composition.symbols.forEach(s => drawSymbol(s));
     
     drawRulers();
@@ -35,7 +33,6 @@ export function redrawAll() {
 
 /**
  * Desenha um único símbolo no canvas.
- * @param {object} s - O objeto do símbolo a ser desenhado.
  */
 function drawSymbol(s) {
     const { ctx } = uiElements;
@@ -65,7 +62,6 @@ function drawSymbol(s) {
             ctx.lineTo(s.endX, s.endY);
             ctx.stroke();
             break;
-        // Adicione outros casos de símbolos aqui...
     }
     ctx.restore();
 }
@@ -74,9 +70,12 @@ function drawSymbol(s) {
  * Desenha as réguas de frequência (Y) e tempo (X).
  */
 function drawRulers() {
-    const { yRulerCtx, xRulerCtx, yRulerCanvas, xRulerCanvas, drawingCanvas } = uiElements;
-    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || "#888";
-    const rulerFont = '10px Inter';
+    const { yRulerCtx, xRulerCtx, yRulerCanvas, xRulerCanvas } = uiElements;
+    if (!yRulerCtx || !xRulerCtx) return;
+
+    const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim() || "#88888";
+    // CORREÇÃO: Adiciona uma fonte de fallback.
+    const rulerFont = '10px Inter, sans-serif';
 
     // Régua Y (Frequência)
     yRulerCtx.clearRect(0, 0, yRulerCanvas.width, yRulerCanvas.height);
@@ -84,14 +83,15 @@ function drawRulers() {
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
     yRulerCtx.textBaseline = 'middle';
-    for (let freq = FREQ_MIN; freq <= FREQ_MAX; freq += 100) {
-        if (freq % 200 !== 0 && freq !== FREQ_MIN) continue;
-        const yPos = yFromFrequency(freq);
-        if (yPos > 0 && yPos < drawingCanvas.height) {
-            yRulerCtx.fillRect(yRulerCanvas.width - 10, yPos, 10, 1);
-            yRulerCtx.fillText(`${Math.round(freq)}`, yRulerCanvas.width - 15, yPos);
+    
+    const noteIntervals = [110, 220, 440, 880, 1760];
+    noteIntervals.forEach(freq => {
+        if (freq >= FREQ_MIN && freq <= FREQ_MAX) {
+            const yPos = yFromFrequency(freq);
+            yRulerCtx.fillRect(yRulerCanvas.width - 15, yPos, 15, 1);
+            yRulerCtx.fillText(`${Math.round(freq)}Hz`, yRulerCanvas.width - 20, yPos);
         }
-    }
+    });
 
     // Régua X (Tempo)
     xRulerCtx.clearRect(0, 0, xRulerCanvas.width, xRulerCanvas.height);
@@ -101,6 +101,8 @@ function drawRulers() {
     xRulerCtx.textBaseline = 'top';
     for (let sec = 0; sec <= MAX_DURATION_SECONDS; sec++) {
         const xPos = sec * PIXELS_PER_SECOND;
+        if (xPos > xRulerCanvas.width) break;
+
         if (sec % 5 === 0) {
             xRulerCtx.fillRect(xPos, 0, 1, 10);
             xRulerCtx.fillText(`${sec}s`, xPos, 12);
@@ -114,53 +116,59 @@ function drawRulers() {
  * Redimensiona os canvas para se ajustarem ao contêiner e redesenha tudo.
  */
 export function resizeAndRedraw() {
-    const { drawingCanvas, canvasContainer, yRulerCanvas, xRulerCanvas, mainCanvasArea } = uiElements;
+    const { drawingCanvas, canvasContainer, yRulerCanvas, xRulerCanvas, mainCanvasArea, yRulerContainer, xRulerContainer } = uiElements;
+    if (!mainCanvasArea) return;
 
     const canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
     const canvasHeight = mainCanvasArea.offsetHeight;
+
+    if (canvasHeight <= 0) return;
 
     drawingCanvas.width = canvasWidth;
     drawingCanvas.height = canvasHeight;
     canvasContainer.style.width = `${canvasWidth}px`;
     canvasContainer.style.height = `${canvasHeight}px`;
 
-    yRulerCanvas.width = 50;
-    yRulerCanvas.height = canvasHeight;
+    if (yRulerCanvas && yRulerContainer) {
+        yRulerCanvas.width = yRulerContainer.offsetWidth;
+        yRulerCanvas.height = canvasHeight;
+    }
 
-    xRulerCanvas.width = canvasWidth;
-    xRulerCanvas.height = 30;
+    if (xRulerCanvas && xRulerContainer) {
+        xRulerCanvas.width = canvasWidth;
+        xRulerCanvas.height = xRulerContainer.offsetHeight;
+    }
 
     redrawAll();
 }
 
 /**
  * Apaga traços e símbolos dentro de um raio específico.
- * @param {number} x - Coordenada X do centro do apagador.
- * @param {number} y - Coordenada Y do centro do apagador.
  */
 export function eraseAt(x, y) {
     let somethingWasErased = false;
-    
-    // Apaga símbolos
-    const initialSymbolCount = state.composition.symbols.length;
-    state.composition.symbols = state.composition.symbols.filter(s => {
-        const dist = Math.hypot(s.x - x, s.y - y);
-        return dist > ERASE_RADIUS;
-    });
-    if (state.composition.symbols.length < initialSymbolCount) {
-        somethingWasErased = true;
-    }
+    const eraseRadiusSquared = ERASE_RADIUS * ERASE_RADIUS;
 
-    // Apaga pontos de traços
+    state.composition.symbols = state.composition.symbols.filter(s => {
+        const dx = s.x - x;
+        const dy = s.y - y;
+        const distSq = dx * dx + dy * dy;
+        if (distSq <= eraseRadiusSquared) somethingWasErased = true;
+        return distSq > eraseRadiusSquared;
+    });
+
     state.composition.strokes.forEach(stroke => {
         const initialLength = stroke.points.length;
-        stroke.points = stroke.points.filter(p => Math.hypot(p.x - x, p.y - y) > ERASE_RADIUS);
+        stroke.points = stroke.points.filter(p => {
+            const dx = p.x - x;
+            const dy = p.y - y;
+            return (dx * dx + dy * dy) > eraseRadiusSquared;
+        });
         if (stroke.points.length < initialLength) {
             somethingWasErased = true;
         }
     });
 
-    // Remove traços que ficaram vazios
     state.composition.strokes = state.composition.strokes.filter(stroke => stroke.points.length > 1);
 
     if (somethingWasErased) {

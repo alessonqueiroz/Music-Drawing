@@ -9,8 +9,9 @@ import { PIXELS_PER_SECOND } from './constants.js';
 const actionHandlers = {
     startAction(e) {
         e.preventDefault();
-        initAudio();
+        initAudio(); // Garante que o audio context está ativo
         const pos = getMousePos(e, uiElements.drawingCanvas);
+        if (!pos) return;
         state.lastPos = pos;
         
         switch (state.activeTool) {
@@ -18,7 +19,8 @@ const actionHandlers = {
                 state.isDrawing = true;
                 const newStroke = {
                     id: Date.now(), points: [pos],
-                    color: uiElements.colorPicker.value, lineWidth: uiElements.lineWidth.value,
+                    color: uiElements.colorPicker.value, 
+                    lineWidth: uiElements.lineWidth.value,
                     timbre: state.activeTimbre
                 };
                 state.composition.strokes.push(newStroke);
@@ -28,13 +30,14 @@ const actionHandlers = {
                 eraseAt(pos.x, pos.y);
                 break;
             case 'glissando':
-                 if (!state.glissandoStart) { state.glissandoStart = pos; } 
-                 else {
+                 if (!state.glissandoStart) { 
+                     state.glissandoStart = pos; 
+                 } else {
                     placeSymbol({ ...state.glissandoStart, endX: pos.x, endY: pos.y });
                     state.glissandoStart = null;
                 }
                 break;
-            default:
+            default: // Para 'staccato', 'percussion', etc.
                 placeSymbol(pos);
                 break;
         }
@@ -43,6 +46,8 @@ const actionHandlers = {
         if (!state.isDrawing) return;
         e.preventDefault();
         const pos = getMousePos(e, uiElements.drawingCanvas);
+        if (!pos) return;
+
         if (state.activeTool === 'pencil') {
             const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
             currentStroke.points.push(pos);
@@ -64,16 +69,24 @@ const actionHandlers = {
         e.preventDefault();
         if (state.isDrawing) {
             state.isDrawing = false;
+            if (state.activeTool === 'pencil' && state.composition.strokes.length > 0 && state.composition.strokes[state.composition.strokes.length - 1].points.length < 2) {
+                state.composition.strokes.pop();
+            }
             saveState();
             updateAllUI();
         }
     },
     togglePlayback() {
         if (!state.composition.strokes.length && !state.composition.symbols.length) return;
-        if (state.isPlaying) stopPlayback(); else startPlayback();
+        if (state.isPlaying) {
+            stopPlayback();
+        } else {
+            startPlayback();
+        }
     },
     handleClear() {
-        if (confirm("Tem certeza de que deseja limpar toda a pauta?")) {
+        if (confirm("Tem certeza de que deseja limpar toda a pauta? Esta ação não pode ser desfeita.")) {
+            stopPlayback();
             resetComposition();
             redrawAll();
             updateAllUI();
@@ -83,17 +96,23 @@ const actionHandlers = {
     redo() { if (redoState()) { redrawAll(); updateAllUI(); } },
     exportJpg() {
         const link = document.createElement('a');
-        link.download = 'pauta-aberta.jpg';
+        link.download = 'music-drawing.jpg';
         link.href = uiElements.drawingCanvas.toDataURL('image/jpeg', 0.9);
         link.click();
     },
     exportPdf() {
-        const { jsPDF } = window.jspdf;
-        const canvas = uiElements.drawingCanvas;
-        const imgData = canvas.toDataURL('image/png');
-        const pdf = new jsPDF({ orientation: canvas.width > canvas.height ? 'l' : 'p', unit: 'px', format: [canvas.width, canvas.height] });
-        pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
-        pdf.save('pauta-aberta.pdf');
+        try {
+            const { jsPDF } = window.jspdf;
+            const canvas = uiElements.drawingCanvas;
+            const imgData = canvas.toDataURL('image/png');
+            const orientation = canvas.width > canvas.height ? 'l' : 'p';
+            const pdf = new jsPDF({ orientation, unit: 'px', format: [canvas.width, canvas.height] });
+            pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+            pdf.save('music-drawing.pdf');
+        } catch(e) {
+            console.error("Erro ao exportar PDF:", e);
+            alert("Não foi possível exportar o PDF. Verifique se a biblioteca jsPDF foi carregada corretamente.");
+        }
     },
     exportWav: exportWav
 };
@@ -103,8 +122,10 @@ function placeSymbol(pos) {
     const symbol = {
         id: Date.now() + Math.random(),
         x: pos.x, y: pos.y, endX: pos.endX, endY: pos.endY,
-        type: state.activeTool, color: uiElements.colorPicker.value,
-        size: parseFloat(uiElements.lineWidth.value), timbre: state.activeTimbre
+        type: state.activeTool, 
+        color: uiElements.colorPicker.value,
+        size: parseFloat(uiElements.lineWidth.value), 
+        timbre: state.activeTimbre
     };
     state.composition.symbols.push(symbol);
     redrawAll();
@@ -116,42 +137,62 @@ async function startPlayback() {
     state.isPlaying = true;
     updatePlaybackUI(true);
     scheduleAllSounds(state.audioCtx);
+    state.playbackStartTime = state.audioCtx.currentTime;
+    state.playbackStartScroll = uiElements.mainCanvasArea.scrollLeft;
     animatePlayhead();
 }
 async function stopPlayback() {
     state.isPlaying = false;
-    await stopAllSounds();
-    cancelAnimationFrame(state.animationFrameId);
+    if (state.audioCtx) {
+        await stopAllSounds();
+    }
+    if (state.animationFrameId) {
+        cancelAnimationFrame(state.animationFrameId);
+        state.animationFrameId = null;
+    }
     updatePlaybackUI(false);
 }
+
 function animatePlayhead() {
     if (!state.isPlaying) return;
-    const startX = uiElements.mainCanvasArea.scrollLeft;
-    const startTime = state.audioCtx.currentTime;
-    function frame() {
-        if (!state.isPlaying) return;
-        const elapsedTime = state.audioCtx.currentTime - startTime;
-        const currentX = startX + (elapsedTime * PIXELS_PER_SECOND);
-        if (currentX >= uiElements.drawingCanvas.width) {
-            stopPlayback();
-            return;
-        }
-        uiElements.playhead.style.left = `${currentX}px`;
-        state.animationFrameId = requestAnimationFrame(frame);
+
+    const elapsedTime = state.audioCtx.currentTime - state.playbackStartTime;
+    const currentX = state.playbackStartScroll + (elapsedTime * PIXELS_PER_SECOND);
+    
+    // Usa transform para mover o playhead. É mais performático que 'left'.
+    uiElements.playhead.style.transform = `translateX(${currentX}px)`;
+
+    // Se a cabeça de leitura chegar ao fim da visualização, role a tela
+    if (currentX > uiElements.mainCanvasArea.scrollLeft + uiElements.mainCanvasArea.clientWidth * 0.8) {
+        uiElements.mainCanvasArea.scrollLeft = currentX - uiElements.mainCanvasArea.clientWidth * 0.8;
     }
-    state.animationFrameId = requestAnimationFrame(frame);
+
+    if (currentX >= uiElements.drawingCanvas.width) {
+        stopPlayback();
+        return;
+    }
+    
+    // CORREÇÃO: A função deve chamar a si mesma para criar o loop
+    state.animationFrameId = requestAnimationFrame(animatePlayhead);
 }
+
 function updateAllUI() {
     updateUndoRedoButtons();
     updateExportButtonsState();
 }
 
 // --- Ponto de Entrada da Aplicação ---
-function initializeApplication(mode) {
-    document.getElementById('selection-container').classList.add('hidden');
+function initializeApplication(mode = 'pc') {
+    const selectionContainer = document.getElementById('selection-container');
     const appWrapper = document.getElementById('app-wrapper');
-    appWrapper.classList.remove('hidden');
-    appWrapper.classList.add('w-full', 'h-full');
+
+    if (selectionContainer) {
+        selectionContainer.classList.add('hidden');
+    }
+    if (appWrapper) {
+        appWrapper.classList.remove('hidden');
+        appWrapper.classList.add('w-full', 'h-full');
+    }
 
     if (mode === 'mobile') {
         document.body.classList.add('mobile-mode');
@@ -162,17 +203,15 @@ function initializeApplication(mode) {
     updateAllUI();
 }
 
-// --- Lógica da Tela de Seleção e Inicialização ---
-// Adiciona um ouvinte para garantir que o DOM esteja totalmente carregado antes de executar o script
+// --- Lógica de Inicialização ---
 document.addEventListener('DOMContentLoaded', () => {
     const pcModeBtn = document.getElementById('pc-mode-btn');
     const mobileModeBtn = document.getElementById('mobile-mode-btn');
 
-    // Adiciona os listeners aos botões de seleção de modo
-    if (pcModeBtn) {
+    if (pcModeBtn && mobileModeBtn) {
         pcModeBtn.addEventListener('click', () => initializeApplication('pc'));
-    }
-    if (mobileModeBtn) {
         mobileModeBtn.addEventListener('click', () => initializeApplication('mobile'));
+    } else {
+        initializeApplication();
     }
 });

@@ -57,18 +57,22 @@ function createEffectsChain(audioCtx) {
 
     // Efeitos
     const distortionNode = audioCtx.createWaveShaper();
-    distortionNode.curve = makeDistortionCurve(parseFloat(uiElements.distortion.value));
+    // CORREÇÃO: Verifica se o elemento 'distortion' existe antes de usar seu valor.
+    const distortionValue = uiElements.distortion ? parseFloat(uiElements.distortion.value) : 0;
+    distortionNode.curve = makeDistortionCurve(distortionValue);
     distortionNode.oversample = '4x';
     distortionNode.connect(compressor);
 
     const reverbGain = audioCtx.createGain();
-    reverbGain.gain.value = parseFloat(uiElements.reverb.value);
+    // CORREÇÃO: Verifica se o elemento 'reverb' existe.
+    reverbGain.gain.value = uiElements.reverb ? parseFloat(uiElements.reverb.value) : 0;
     const reverbNode = audioCtx.createConvolver();
     reverbNode.buffer = createImpulseResponse(audioCtx);
     distortionNode.connect(reverbGain).connect(reverbNode).connect(compressor);
 
     const delayGain = audioCtx.createGain();
-    delayGain.gain.value = parseFloat(uiElements.delay.value);
+    // CORREÇÃO: Verifica se o elemento 'delay' existe.
+    delayGain.gain.value = uiElements.delay ? parseFloat(uiElements.delay.value) : 0;
     const delayNode = audioCtx.createDelay(1.0);
     delayNode.delayTime.value = 0.5;
     const delayFeedback = audioCtx.createGain();
@@ -177,7 +181,7 @@ function scheduleSymbols(audioCtx, now, mainOut) {
  */
 function createDiscreteTone(audioCtx, mainOut, opts) {
     const { type, startTime, duration, freq, endFreq, vol, pan } = opts;
-    let osc, sourceNode;
+    let sourceNode;
     const endTime = startTime + duration;
     
     const mainGain = audioCtx.createGain();
