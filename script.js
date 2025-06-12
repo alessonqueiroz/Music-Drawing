@@ -129,7 +129,7 @@ function redrawAll() {
 
 function drawRulers() {
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
-    const rulerFont = '11px Inter';
+    const rulerFont = '9px Inter';
     
     yRulerCtx.clearRect(0, 0, el.yRulerCanvas.width, el.yRulerCanvas.height);
     yRulerCtx.fillStyle = textColor;
@@ -150,16 +150,16 @@ function drawRulers() {
     xRulerCtx.fillStyle = textColor;
     xRulerCtx.font = rulerFont;
     xRulerCtx.textAlign = 'center';
-    xRulerCtx.textBaseline = 'middle';
+    xRulerCtx.textBaseline = 'top';
     
     const interval = window.innerWidth < 768 ? 10 : 5; // Wider spacing on mobile
     for (let sec = 0; sec <= MAX_DURATION_SECONDS; sec++) {
         const xPos = sec * PIXELS_PER_SECOND;
         if (sec % interval === 0) {
-            xRulerCtx.fillRect(xPos, 0, 1, 10);
+            xRulerCtx.fillRect(xPos, 0, 10, 10);
             xRulerCtx.fillText(`${sec}s`, xPos, 18);
         } else if (sec % 1 === 0) {
-            xRulerCtx.fillRect(xPos, 0, 1, 5);
+            xRulerCtx.fillRect(xPos, 0, 10, 5);
         }
     }
 }
