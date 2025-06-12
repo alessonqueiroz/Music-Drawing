@@ -48,31 +48,29 @@ body { background-color: var(--bg-dark); color: var(--text-light); font-family: 
 .mode-btn:hover { transform: translateY(-3px); box-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow); background-color: rgba(169, 114, 255, 0.1); }
 
 /* ==========================================================================
-   4. Layout da Aplicação - CORRIGIDO
+   4. Layout da Aplicação
    ========================================================================== */
 .app-container {
     background: var(--bg-dark-accent);
     border: 1px solid var(--border-color-dark);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    /* O contêiner principal agora é uma coluna flex, garantindo a distribuição vertical */
     display: flex;
     flex-direction: column;
 }
 header { 
     border-color: var(--border-color-dark) !important; 
-    flex-shrink: 0; /* Impede que o header encolha */
+    flex-shrink: 0; 
 }
-/* Este é o contêiner principal que segura a barra lateral e o canvas */
 .app-body {
     display: flex;
     flex-grow: 1;
-    min-height: 0; /* Essencial para que o 'overflow' funcione em filhos de containers flex */
+    min-height: 0;
 }
 
 aside { 
     background-color: var(--bg-dark-sidebar); 
     border-color: var(--border-color-dark) !important; 
-    flex-shrink: 0; /* Impede que a barra lateral encolha */
+    flex-shrink: 0;
 }
 
 main#canvas-wrapper {
@@ -82,8 +80,8 @@ main#canvas-wrapper {
         "corner x-ruler";
     grid-template-rows: 1fr auto;
     grid-template-columns: auto 1fr;
-    flex-grow: 1; /* Faz o <main> ocupar todo o espaço restante */
-    min-width: 0;  /* Essencial para conter o canvas largo */
+    flex-grow: 1;
+    min-width: 0;
 }
 
 #main-canvas-area {
@@ -92,6 +90,8 @@ main#canvas-wrapper {
     overflow: auto;
     min-width: 0;
     min-height: 0;
+    scrollbar-width: thin; 
+    scrollbar-color: rgba(169, 114, 255, 0.4) transparent;
 }
 
 .title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
@@ -125,11 +125,18 @@ input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
 #canvas-container { position: relative; }
 #drawingCanvas, #y-ruler-canvas, #x-ruler-canvas { display: block; background-color: var(--bg-dark); }
 #y-ruler-canvas, #x-ruler-canvas { height: 100%; width: 100%; }
-#playhead { width: 2px; height: 100%; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); position: absolute; top: 0; left: 0; transform: translateX(0); }
+#playhead { width: 2px; height: 100%; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); position: absolute; top: 0; left: 0; transform: translateX(0); z-index: 5; pointer-events: none; }
+
 .custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.2); border-radius: 10px; }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(169, 114, 255, 0.4); }
+
+#main-canvas-area::-webkit-scrollbar { width: 8px; height: 8px; }
+#main-canvas-area::-webkit-scrollbar-track { background: var(--bg-dark-accent); }
+#main-canvas-area::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.4); border-radius: 10px; border: 2px solid var(--bg-dark-accent); }
+#main-canvas-area::-webkit-scrollbar-thumb:hover { background: var(--primary-glow); }
+
 #loading-overlay .loader { width: 60px; height: 60px; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -151,18 +158,3 @@ body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width:
 body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 20px; grid-template-columns: 35px 1fr; }
 body.mobile-mode #y-ruler-container { width: 35px; }
 body.mobile-mode #x-ruler-container { height: 20px; }
-
-/*
-  --- MODO DE DEBUG ---
-  Se o problema de layout persistir, descomente o bloco de código abaixo.
-  Isso adicionará bordas coloridas aos principais contêineres para que você
-  possa ver o tamanho real que eles estão ocupando na tela com a ferramenta
-  de desenvolvedor do navegador (F12).
-*/
-/*
-.app-container { border: 2px solid orange; }
-.app-body { border: 2px solid yellow; }
-aside { border: 2px solid green; }
-main#canvas-wrapper { border: 2px solid blue; }
-#main-canvas-area { border: 2px solid purple; }
-*/
