@@ -4,7 +4,7 @@ const { jsPDF } = window.jspdf;
 
 // --- CONSTANTS ---
 const MAX_DURATION_SECONDS = 600; // 10 minutes
-const PIXELS_PER_SECOND = 40;
+const PIXELS_PER_SECOND = 100;
 const FREQ_MIN = 100;
 const FREQ_MAX = 2000;
 const ERASE_RADIUS = 20;
@@ -156,10 +156,12 @@ function drawRulers() {
     for (let sec = 0; sec <= MAX_DURATION_SECONDS; sec++) {
         const xPos = sec * PIXELS_PER_SECOND;
         if (sec % interval === 0) {
-            xRulerCtx.fillRect(xPos, 0, 10, 10);
-            xRulerCtx.fillText(`${sec}s`, xPos, 18);
+            // Alterado para desenhar uma LINHA de 1px de largura para a marcação principal
+            xRulerCtx.fillRect(xPos, 0, 1, 10);
+            xRulerCtx.fillText(`${sec}seg.`, xPos, 8);
         } else if (sec % 1 === 0) {
-            xRulerCtx.fillRect(xPos, 0, 10, 5);
+            // Alterado para desenhar uma LINHA de 1px para as marcações secundárias
+            xRulerCtx.fillRect(xPos, 0, 1, 5);
         }
     }
 }
