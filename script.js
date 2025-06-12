@@ -8,6 +8,7 @@ const PIXELS_PER_SECOND = 40;
 const FREQ_MIN = 100;
 const FREQ_MAX = 2000;
 const ERASE_RADIUS = 20;
+const AUTOSAVE_KEY = 'music-drawing-autosave';
 
 // --- DOM ELEMENTS ---
 const el = {
@@ -20,6 +21,11 @@ const el = {
     themeToggle: d.getElementById('theme-toggle'),
     themeSun: d.getElementById('theme-icon-sun'), themeMoon: d.getElementById('theme-icon-moon'),
     loadingOverlay: d.getElementById('loading-overlay'),
+    
+    saveProjectBtn: d.getElementById('saveProjectBtn'),
+    importProjectBtn: d.getElementById('importProjectBtn'),
+    musdrImporter: d.getElementById('musdrImporter'),
+
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
     
@@ -64,6 +70,7 @@ function initApp(mode = 'pc') {
         d.body.classList.add('mobile-mode');
     }
     
+    loadAutoSavedProject(); // Check for autosaved project
     setupEventListeners();
     applyTheme(localStorage.getItem('music-drawing-theme') || 'dark');
     setActiveTool('pencil');
@@ -71,7 +78,9 @@ function initApp(mode = 'pc') {
     
     setTimeout(() => {
         resizeAndRedraw();
-        saveState();
+        if (state.history.length === 0) {
+            saveState(true); // Save initial empty state
+        }
     }, 100);
 }
 
@@ -174,6 +183,10 @@ function setupEventListeners() {
     Object.keys(el.tools).forEach(key => el.tools[key]?.addEventListener('click', () => setActiveTool(key)));
     Object.keys(el.timbres).forEach(key => el.timbres[key]?.addEventListener('click', () => setActiveTimbre(key)));
     
+    el.saveProjectBtn.addEventListener('click', saveProject);
+    el.importProjectBtn.addEventListener('click', () => el.musdrImporter.click());
+    el.musdrImporter.addEventListener('change', importProject);
+
     el.exportJpgBtn.addEventListener('click', exportJpg);
     el.exportPdfBtn.addEventListener('click', exportPdf);
     el.exportWavBtn.addEventListener('click', exportWav);
@@ -184,6 +197,7 @@ function setupEventListeners() {
         if (e.ctrlKey || e.metaKey) {
             if (e.key === 'z') { e.preventDefault(); undo(); }
             if (e.key === 'y') { e.preventDefault(); redo(); }
+            if (e.key === 's') { e.preventDefault(); saveProject(); }
         }
         if (e.key === ' ' && e.target === d.body) { e.preventDefault(); togglePlayback(); }
     });
@@ -272,10 +286,12 @@ function syncScroll(e) {
 
 // --- DRAWING & COMPOSITION ---
 function handleClear() {
-    if (confirm("Tem certeza de que deseja limpar toda a pauta?")) {
+    if (confirm("Tem certeza de que deseja limpar toda a pauta? Esta ação não pode ser desfeita.")) {
         state.composition = { strokes: [], symbols: [] };
+        state.history = [];
+        state.historyIndex = -1;
+        saveState(true); // Save the new empty state
         redrawAll();
-        saveState();
     }
 }
 
@@ -329,22 +345,90 @@ function eraseAt(x, y) {
     });
     state.composition.strokes = state.composition.strokes.filter(stroke => stroke.points.length > 1);
 
-    if (somethingWasErased) redrawAll();
+    if (somethingWasErased) {
+        redrawAll();
+        saveState();
+    }
 }
 
-// --- UNDO / REDO ---
-function saveState() {
-    state.history.length = state.historyIndex + 1;
+// --- PROJECT SAVE/LOAD/IMPORT ---
+function saveProject() {
+    try {
+        const projectData = JSON.stringify(state.composition);
+        const blob = new Blob([projectData], { type: 'application/json' });
+        const link = d.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `meu-projeto-${Date.now()}.musdr`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch (e) {
+        console.error("Erro ao salvar projeto:", e);
+        alert("Não foi possível salvar o projeto.");
+    }
+}
+
+function importProject(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const projectData = JSON.parse(e.target.result);
+            // Basic validation
+            if (projectData && Array.isArray(projectData.strokes) && Array.isArray(projectData.symbols)) {
+                state.composition = projectData;
+                redrawAll();
+                saveState(); // Add imported state to history
+            } else {
+                throw new Error("Formato de arquivo inválido.");
+            }
+        } catch (err) {
+            console.error("Erro ao importar projeto:", err);
+            alert("Erro ao ler o arquivo do projeto. Ele pode estar corrompido ou não ser um arquivo .musdr válido.");
+        } finally {
+            // Reset input to allow importing the same file again
+            event.target.value = null;
+        }
+    };
+    reader.readAsText(file);
+}
+
+function loadAutoSavedProject() {
+    const savedJson = localStorage.getItem(AUTOSAVE_KEY);
+    if (savedJson) {
+        try {
+            const savedComposition = JSON.parse(savedJson);
+            if (savedComposition && (savedComposition.strokes.length > 0 || savedComposition.symbols.length > 0)) {
+                if (confirm("Encontramos um projeto salvo automaticamente. Deseja carregá-lo?")) {
+                    state.composition = savedComposition;
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao carregar projeto do localStorage:", e);
+            localStorage.removeItem(AUTOSAVE_KEY);
+        }
+    }
+}
+
+// --- UNDO / REDO & HISTORY ---
+function saveState(isInitial = false) {
+    if (!isInitial) {
+        state.history.length = state.historyIndex + 1;
+    }
     state.history.push(JSON.parse(JSON.stringify(state.composition)));
     state.historyIndex++;
     updateUndoRedoButtons();
     updateExportButtonsState();
+    // Auto-save to localStorage
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition));
 }
 
 function undo() {
     if (state.historyIndex > 0) {
         state.historyIndex--;
         state.composition = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition)); // Update autosave on undo
         redrawAll();
         updateUndoRedoButtons();
         updateExportButtonsState();
@@ -355,6 +439,7 @@ function redo() {
     if (state.historyIndex < state.history.length - 1) {
         state.historyIndex++;
         state.composition = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition)); // Update autosave on redo
         redrawAll();
         updateUndoRedoButtons();
         updateExportButtonsState();
@@ -367,8 +452,7 @@ function updateUndoRedoButtons() {
 }
 
 
-// --- AUDIO ENGINE (REWRITTEN) ---
-
+// --- AUDIO ENGINE ---
 async function initAudio() {
     if (state.audioCtx && state.audioCtx.state !== 'closed') return;
     try {
@@ -648,6 +732,7 @@ function updateExportButtonsState() {
     el.exportJpgBtn.disabled = isEmpty;
     el.exportPdfBtn.disabled = isEmpty;
     el.exportWavBtn.disabled = isEmpty;
+    el.saveProjectBtn.disabled = isEmpty;
 }
 
 function yToFrequency(y) {

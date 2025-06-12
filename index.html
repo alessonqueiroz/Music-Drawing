@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Music Drawing v2.1</title>
+    <title>Music Drawing</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -22,8 +22,8 @@
             <h1 class="text-3xl md:text-5xl font-bold mb-4">Music Drawing</h1>
             <p class="text-md md:text-lg text-slate-300 mb-10">Seja bem-vindo. Desenhe a sua música!</p>
             <div class="flex flex-col md:flex-row gap-4 w-full max-w-lg mx-auto">
-                <button id="pc-mode-btn" class="mode-btn">💻 Modo PC</button>
-                <button id="mobile-mode-btn" class="mode-btn">📱 Modo Mobile</button>
+                <button id="pc-mode-btn" class="mode-btn">💻 Entrar no Estúdio</button>
+                <button id="mobile-mode-btn" class="mode-btn">📱 Versão Mobile</button>
             </div>
             <p class="text-xs text-slate-500 mt-10">© Desenvolvido por Alesson Queiroz</p>
         </div>
@@ -31,16 +31,18 @@
 
     <div id="app-wrapper" class="hidden w-full h-full p-2 md:p-4">
         <div class="app-container w-full h-full flex flex-col rounded-2xl overflow-hidden">
-            <header class="p-3 md:p-4 border-b flex justify-between items-center flex-shrink-0 flex-wrap gap-4">
+            <header class="p-3 md:p-4 border-b flex justify-between items-center flex-shrink-0 flex-wrap gap-2">
                 <div>
-                    <h1 class="text-xl md:text-2xl font-bold title-accent">Music Drawing <span class="text-base font-normal align-middle subtitle-color">v2.1</span></h1>
-                    <p class="text-xs md:text-sm subtitle-color">Desenhe sua música! Duração máxima: 10 minutos.</p>
+                    <h1 class="text-xl md:text-2xl font-bold title-accent">Music Drawing <span class="text-base font-normal align-middle subtitle-color"></span></h1>
+                    <p class="text-xs md:text-sm subtitle-color">Desenhe, salve e compartilhe sua música.</p>
                 </div>
-                <div class="flex items-center gap-2 md:gap-3">
+                <div class="flex items-center gap-2 md:gap-3 flex-wrap">
+                    <button id="saveProjectBtn" class="tool-btn" title="Salvar Projeto (.musdr)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> <span class="hidden md:inline">Salvar</span></button>
+                    <button id="importProjectBtn" class="tool-btn" title="Importar Projeto (.musdr)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> <span class="hidden md:inline">Importar</span></button>
                     <button id="undoBtn" class="tool-btn" title="Desfazer (Ctrl+Z)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13v-2.2A4.8 4.8 0 0 0 16.2 6H5M4 8l-3 3 3 3"/></svg></button>
                     <button id="redoBtn" class="tool-btn" title="Refazer (Ctrl+Y)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13v-2.2A4.8 4.8 0 0 1 7.8 6H19M20 8l3 3-3 3"/></svg></button>
                     <div class="dropdown">
-                        <button id="exportBtn" class="tool-btn primary" title="Exportar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span class="hidden md:inline">Exportar</span></button>
+                        <button id="exportBtn" class="tool-btn primary" title="Exportar Mídia"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span class="hidden md:inline">Exportar</span></button>
                         <div class="dropdown-content">
                             <button id="exportJpgBtn">Exportar JPG</button>
                             <button id="exportPdfBtn">Exportar PDF</button>
@@ -115,6 +117,7 @@
         <div class="loader"></div><p>Renderizando áudio...</p>
     </div>
 
+    <input type="file" id="musdrImporter" class="hidden" accept=".musdr">
     <script type="module" src="script.js"></script>
 </body>
 </html>
