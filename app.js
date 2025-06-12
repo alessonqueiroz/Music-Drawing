@@ -1,4 +1,4 @@
-// script.js - Music Drawing App (versão revisada com inicialização DOM segura e correção do bug do áudio)
+// script.js - Music Drawing App (versão revisada com inicialização DOM segura, correção do botão "Parar" e pronto para mobile)
 
 // Aguarda o DOM carregar antes de inicializar
 document.addEventListener('DOMContentLoaded', () => {
@@ -128,7 +128,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resizeAndRedraw() {
-        const canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
+        // Ajusta a largura do canvas no mobile para facilitar scroll horizontal
+        let canvasWidth;
+        if (window.innerWidth < 800) {
+            // No mobile, mantenha o canvas um pouco mais largo para permitir scroll
+            canvasWidth = Math.max(window.innerWidth, MAX_DURATION_SECONDS * PIXELS_PER_SECOND);
+        } else {
+            canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
+        }
         const canvasHeight = el.mainCanvasArea.offsetHeight;
         el.canvas.width = canvasWidth;
         el.canvas.height = canvasHeight;
@@ -464,7 +471,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el.loadingOverlay) el.loadingOverlay.classList.remove('hidden');
         try {
             await new Promise(resolve => setTimeout(resolve, 100));
-            // Calcule duração máxima da composição, não use sempre MAX_DURATION_SECONDS
             let maxX = 0;
             state.composition.strokes.forEach(stroke => {
                 stroke.points.forEach(p => { if (p.x > maxX) maxX = p.x; });
@@ -539,14 +545,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // NOVO: Botão Parar 100% confiável
     function togglePlayback() {
         if (!state.composition.strokes.length && !state.composition.symbols.length) return;
-        state.isPlaying ? stopPlayback() : startPlayback();
+        if (state.isPlaying) {
+            stopPlayback().catch(console.error);
+        } else {
+            startPlayback().catch(console.error);
+        }
     }
 
     async function startPlayback() {
         await initAudio();
         state.isPlaying = true;
+        if (el.playBtn) el.playBtn.disabled = true;
         el.playhead.style.left = `${el.mainCanvasArea.scrollLeft}px`;
         el.playhead.classList.remove('hidden');
         el.playIcon.classList.add('hidden');
@@ -554,23 +566,25 @@ document.addEventListener('DOMContentLoaded', () => {
         el.playBtnText.textContent = "Parar";
         scheduleAllSounds(state.audioCtx);
         animatePlayhead();
+        setTimeout(() => { if (el.playBtn) el.playBtn.disabled = false; }, 300);
     }
 
-    function stopPlayback() {
+    async function stopPlayback() {
+        if (el.playBtn) el.playBtn.disabled = true;
         state.isPlaying = false;
         state.sourceNodes.forEach(node => {
-            try { node.stop(0); } catch (e) { /* ignore */ }
+            try { node.stop(0); } catch (e) {}
         });
         state.sourceNodes = [];
-        // Em vez de fechar, apenas suspenda o contexto para evitar bugs e permitir play subsequente
         if (state.audioCtx && state.audioCtx.state === 'running') {
-            state.audioCtx.suspend();
+            await state.audioCtx.suspend();
         }
         cancelAnimationFrame(state.animationFrameId);
         el.playhead.classList.add('hidden');
         el.playIcon.classList.remove('hidden');
         el.pauseIcon.classList.add('hidden');
         el.playBtnText.textContent = "Tocar";
+        setTimeout(() => { if (el.playBtn) el.playBtn.disabled = false; }, 300);
     }
 
     function animatePlayhead() {
@@ -653,7 +667,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const vol = 0.1 + (stroke.lineWidth / 50) * 0.4;
 
             if (continuousTimbres.includes(stroke.timbre)) {
-                // Lógica para som contínuo e fluido
                 const panner = audioCtx.createStereoPanner();
                 const mainGain = audioCtx.createGain();
                 mainGain.connect(panner).connect(mainOut);
@@ -710,7 +723,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
             } else {
-                // Lógica antiga (correta para timbres discretos) - cria um som para cada segmento
                 for (let i = 0; i < stroke.points.length - 1; i++) {
                     const p1 = stroke.points[i];
                     const p2 = stroke.points[i + 1];
@@ -825,7 +837,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 carrier.stop(endTime);
                 state.sourceNodes.push(modulator, carrier);
                 break;
-            default: // Ondas básicas
+            default:
                 osc = audioCtx.createOscillator();
                 osc.type = opts.type;
                 osc.frequency.setValueAtTime(opts.freq, opts.startTime);

@@ -1,205 +1,143 @@
-:root {
-    --bg-primary: #f9fafb;
-    --bg-secondary: #ffffff;
-    --bg-canvas: #f3f4f6;
-    --text-primary: #111827;
-    --text-secondary: #6b7280;
-    --border-color: #e5e7eb;
-    --accent-color: #4f46e5;
-    --tool-bg: #f3f4f6;
-    --tool-bg-hover: #e5e7eb;
+/* Responsividade e usabilidade mobile para Music Drawing */
+
+/* Layout mobile: sidebar como barra inferior, canvas ocupa o topo */
+@media (max-width: 900px) {
+    .app-container {
+        flex-direction: column !important;
+        height: 100vh !important;
+        min-height: 100vh;
+    }
+    aside {
+        order: 2;
+        width: 100vw !important;
+        min-width: 0;
+        max-width: 100vw;
+        height: auto;
+        border-right: none;
+        border-top: 1px solid #eee;
+        background: var(--bg-secondary, #fafafa);
+        display: flex;
+        flex-direction: row;
+        flex-wrap: wrap;
+        justify-content: space-around;
+        align-items: center;
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        z-index: 999;
+        padding: 6px 2px;
+        box-shadow: 0 -2px 10px 0 rgba(0,0,0,0.08);
+    }
+    main#canvas-wrapper {
+        order: 1;
+        width: 100vw !important;
+        height: calc(100vh - 66px) !important;
+        padding: 0 !important;
+        margin-bottom: 66px !important;
+        min-height: 250px;
+        max-height: 100vh;
+    }
+    #main-canvas-area, #canvas-container {
+        width: 100vw !important;
+        max-width: 100vw !important;
+        height: 100% !important;
+        overflow-x: auto;
+        touch-action: pan-x pan-y;
+    }
+    #drawingCanvas {
+        max-width: 100vw !important;
+        width: 100vw !important;
+        height: 60vh !important;
+        min-height: 200px;
+        display: block;
+        margin: auto;
+        background: #fff;
+        border-radius: 10px;
+        box-shadow: 0 1px 8px 0 rgba(0,0,0,0.08);
+    }
+    .sidebar-section {
+        width: 48vw;
+        min-width: 120px;
+        margin: 2px 0;
+        padding: 2px 0;
+        flex: none;
+    }
+    /* Espaço para sliders e botões ficarem maiores */
+    input[type="range"], .tool-btn, .timbre-btn, .sidebar-section button {
+        min-width: 44px;
+        min-height: 44px;
+        font-size: 1.13em;
+        margin: 4px;
+    }
+    .sidebar-section h2 {
+        font-size: 1rem;
+        margin-bottom: 2px;
+        text-align: center;
+    }
 }
 
-[data-theme="dark"] {
-    --bg-primary: #0a0a0a;
-    --bg-secondary: #111111;
-    --bg-canvas: #1f2937;
-    --text-primary: #e5e7eb;
-    --text-secondary: #9ca3af;
-    --border-color: #374151;
-    --accent-color: #818cf8;
-    --tool-bg: #27272a;
-    --tool-bg-hover: #374151;
+/* Melhorias para modo paisagem */
+@media (max-width: 900px) and (orientation: landscape) {
+    #drawingCanvas {
+        height: 70vh !important;
+        min-height: 120px;
+    }
+    .sidebar-section {
+        width: 30vw;
+        min-width: 80px;
+    }
 }
 
-body {
-    font-family: 'Inter', 'Poppins', sans-serif;
-    background-color: var(--bg-primary);
-    color: var(--text-primary);
-    transition: background-color 0.3s, color 0.3s;
-}
-
-.app-container {
-    background-color: var(--bg-secondary);
-    border: 1px solid var(--border-color);
-}
-
-header,
-aside {
-    border-color: var(--border-color);
-}
-
-.title-accent { color: var(--accent-color); }
-.subtitle-color { color: var(--text-secondary); }
-
-.tool-btn,
-.timbre-btn {
-    background-color: var(--tool-bg);
-    border: 1px solid var(--border-color);
-    transition: all 0.2s ease-in-out;
-}
-
-.tool-btn:hover,
-.timbre-btn:hover {
-    background-color: var(--tool-bg-hover);
-    transform: translateY(-2px);
-    border-color: var(--text-secondary);
-}
-
-.tool-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: translateY(0);
-    background-color: var(--tool-bg);
-}
-
-.tool-btn.active,
-.timbre-btn.active {
-    background-color: var(--accent-color);
-    color: white;
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
-    transform: translateY(0);
-    border-color: var(--accent-color);
-}
-
-[data-theme="dark"] .tool-btn.active,
-[data-theme="dark"] .timbre-btn.active {
-    background-color: #6366f1;
-    border-color: #6366f1;
-}
-
-#playhead {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 2px;
-    height: 100%;
-    background: #ec4899;
-    box-shadow: 0 0 8px #ec4899, 0 0 12px #ec4899, 0 0 16px #be185d;
-    pointer-events: none;
-    z-index: 100;
-}
-
-canvas {
-    background-color: var(--bg-canvas);
-    border-radius: 0.75rem;
-    display: block;
-    image-rendering: -webkit-optimize-contrast;
-    image-rendering: crisp-edges;
-}
-
-#main-canvas-area {
-    overflow-x: auto;
-    overflow-y: hidden;
-}
-
-.sidebar-section {
-    border-top: 1px solid var(--border-color);
-    padding-top: 1rem;
-    margin-top: 1rem;
-}
-
-input[type=range]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 16px;
-    height: 16px;
-    background: var(--accent-color);
-    cursor: pointer;
-    border-radius: 50%;
-    box-shadow: 0 0 5px var(--accent-color);
-}
-
-input[type=range]::-webkit-slider-runnable-track {
-    background: var(--tool-bg-hover);
-    height: 4px;
-    border-radius: 2px;
-}
-
-.dropdown {
-    position: relative;
-    display: inline-block;
-}
-
-.dropdown-content {
+/* Ajuste para o botão de menu mobile (opcional, se adicionar um menu flutuante) */
+#mobileMenuBtn {
     display: none;
-    position: absolute;
-    right: 0;
-    background-color: var(--bg-secondary);
-    min-width: 160px;
-    box-shadow: 0px 8px 16px 0px rgba(0, 0, 0, 0.2);
-    z-index: 101;
-    border-radius: 0.5rem;
-    border: 1px solid var(--border-color);
-    overflow: hidden;
+}
+@media (max-width: 900px) {
+    #mobileMenuBtn {
+        display: block;
+        position: fixed;
+        z-index: 1200;
+        top: 10px;
+        right: 10px;
+    }
 }
 
-.dropdown-content button {
-    color: var(--text-primary);
-    padding: 12px 16px;
-    text-decoration: none;
-    display: block;
-    width: 100%;
-    text-align: left;
-    background: none;
-    border: none;
+/* Torna botões e sliders mais acessíveis ao toque */
+input[type="range"] {
+    touch-action: pan-x pan-y;
+    -webkit-tap-highlight-color: transparent;
 }
 
-.dropdown-content button:hover {
-    background-color: var(--tool-bg-hover);
+/* Ajusta o playhead para mobile */
+#playhead {
+    width: 3px;
+    background: #eb3b65;
+    border-radius: 2px;
+    opacity: 0.8;
 }
 
-.dropdown:hover .dropdown-content {
-    display: block;
+/* Melhora rolagem horizontal do canvas no mobile */
+#main-canvas-area {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+}
+#canvas-container {
+    scroll-snap-align: center;
 }
 
-.loader {
-    width: 50px;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    border: 8px solid #f3f3f3;
-    border-top-color: #ec4899;
-    animation: spin 1s ease-in-out infinite;
+/* Garante contraste e visibilidade dos controles */
+aside, .sidebar-section, #main-canvas-area, #canvas-container {
+    background: var(--bg-secondary, #f9f9fa);
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
+/* Pequenos ajustes de usabilidade para botões */
+.tool-btn, .timbre-btn {
+    border-radius: 10px !important;
+    background: #f3f3f3;
+    transition: background 0.2s;
 }
-
-#canvas-wrapper {
-    display: grid;
-    grid-template-columns: 50px 1fr;
-    grid-template-rows: 1fr 30px;
-    width: 100%;
-    height: 100%;
-}
-
-/* Custom Scrollbar Styling */
-.custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-    background: var(--tool-bg);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-    background-color: var(--text-secondary);
-    border-radius: 10px;
-    border: 2px solid var(--tool-bg);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-    background-color: var(--accent-color);
+.tool-btn.active, .timbre-btn.active {
+    background: #eb3b65;
+    color: #fff;
 }
