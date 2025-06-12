@@ -37,7 +37,7 @@ const el = {
     xRulerContainer: d.getElementById('x-ruler-container'),
     yRulerContainer: d.getElementById('y-ruler-container'),
 
-    tools: { pencil: d.getElementById('pencil'), eraser: d.getElementById('eraser'), glissando: d.getElementById('glissando'), staccato: d.getElementById('staccato'), percussion: d.getElementById('percussion'), arpeggio: d.getElementById('arpeggio'), granular: d.getElementById('granular'), tremolo: d.getElementById('tremolo'), filter: d.getElementById('filter'), delay: d.getElementById('delay') },
+    tools: { pencil: d.getElementById('pencil'), eraser: d.getElementById('eraser'), hand: d.getElementById('hand'), glissando: d.getElementById('glissando'), staccato: d.getElementById('staccato'), percussion: d.getElementById('percussion'), arpeggio: d.getElementById('arpeggio'), granular: d.getElementById('granular'), tremolo: d.getElementById('tremolo'), filter: d.getElementById('filter'), delay: d.getElementById('delay') },
     timbres: { sine: d.getElementById('sine'), square: d.getElementById('square'), sawtooth: d.getElementById('sawtooth'), triangle: d.getElementById('triangle'), fm: d.getElementById('fm'), pulse: d.getElementById('pulse') }
 };
 
@@ -249,6 +249,11 @@ function startAction(e) {
             state.isDrawing = true;
             eraseAt(pos.x, pos.y);
             break;
+        case 'hand':
+            state.isDrawing = true;
+            state.lastPos = pos;
+            el.canvas.style.cursor = 'grabbing';
+            break;
         case 'glissando':
             if (!state.glissandoStart) {
                 state.glissandoStart = pos;
@@ -267,6 +272,12 @@ function stopAction(e) {
     if (state.isDrawing) {
         e.preventDefault();
         state.isDrawing = false;
+        
+        if (state.activeTool === 'hand') {
+            el.canvas.style.cursor = 'grab';
+            return;
+        }
+
         ctx.beginPath();
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (currentStroke && currentStroke.points.length > 200) {
@@ -280,6 +291,15 @@ function performAction(e) {
     if (!state.isDrawing) return;
     e.preventDefault();
     const pos = getEventPos(e);
+
+    if (state.activeTool === 'hand') {
+        const dx = pos.x - state.lastPos.x;
+        const dy = pos.y - state.lastPos.y;
+        el.mainCanvasArea.scrollLeft -= dx;
+        el.mainCanvasArea.scrollTop -= dy;
+        state.lastPos = pos;
+        return;
+    }
 
     if (state.activeTool === 'pencil') {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
@@ -778,6 +798,7 @@ function setActiveTool(toolName) {
     let cursor = 'crosshair';
     if (['staccato', 'percussion', 'arpeggio', 'granular', 'tremolo', 'filter', 'delay'].includes(toolName)) cursor = 'copy';
     if (toolName === 'glissando') cursor = 'pointer';
+    if (toolName === 'hand') cursor = 'grab';
     if (toolName === 'eraser') cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="2,2"/></svg>') 12 12, auto`;
     el.canvas.style.cursor = cursor;
 }

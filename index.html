@@ -16,7 +16,6 @@
 </head>
 <body class="flex flex-col items-center justify-center h-screen bg-gray-900">
 
-    <!-- Tela de Seleção Inicial -->
     <div id="selection-container" class="w-full h-full flex items-center justify-center p-4">
         <div class="background-animation"></div>
         <div class="selection-box text-center p-8 md:p-12 rounded-2xl">
@@ -30,7 +29,6 @@
         </div>
     </div>
 
-    <!-- Wrapper Principal da Aplicação -->
     <div id="app-wrapper" class="hidden w-full h-full p-2 md:p-4">
         <div class="app-container w-full h-full flex flex-col rounded-2xl overflow-hidden">
             <header class="p-3 md:p-4 border-b flex justify-between items-center flex-shrink-0 flex-wrap gap-2">
@@ -65,7 +63,6 @@
             
             <div class="app-body">
                 <aside class="p-3 md:p-4 border-r flex flex-col gap-4 flex-shrink-0 w-64">
-                    <!-- Mobile Toolbar Tabs -->
                     <div id="mobile-toolbar-tabs">
                         <button class="toolbar-tab active" data-tab="tools">Ferramentas</button>
                         <button class="toolbar-tab" data-tab="style">Estilo</button>
@@ -73,13 +70,13 @@
                         <button class="toolbar-tab" data-tab="timbres">Timbres</button>
                     </div>
 
-                    <!-- Panels Container -->
                     <div id="panels-container">
                         <div class="sidebar-section toolbar-panel active" data-panel="tools">
                             <h2 class="sidebar-title">Ferramentas</h2>
                             <div class="grid grid-cols-3 gap-2">
                                 <button id="pencil" class="tool-btn flex-col" title="Lápis"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg><span class="text-xs mt-1">Lápis</span></button>
                                 <button id="eraser" class="tool-btn flex-col" title="Borracha"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7m-5-9l5 5"/></svg><span class="text-xs mt-1">Borracha</span></button>
+                                <button id="hand" class="tool-btn flex-col" title="Mover"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18v3.9c0 .6.6 1.1 1.2 1.1h5.5c.7 0 1.3-.5 1.3-1.1V18M8 18h9a2 2 0 0 0 2-2v-5c0-1.1-.9-2-2-2h-1.4c-.5 0-1-.2-1.3-.5L13 6.1c-.3-.4-.9-.6-1.4-.6h-1.4c-.5 0-1 .2-1.3.5l-2.6 3.4c-.3.4-.9-.6-1.4.6H4c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2h4Z"></path></svg><span class="text-xs mt-1">Mover</span></button>
                                 <button id="glissando" class="tool-btn flex-col" title="Glissando"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="21" x2="21" y2="3"></line></svg><span class="text-xs mt-1">Glissando</span></button>
                                 <button id="staccato" class="tool-btn flex-col" title="Staccato"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="2"></circle></svg><span class="text-xs mt-1">Staccato</span></button>
                                 <button id="percussion" class="tool-btn flex-col" title="Percussão"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg><span class="text-xs mt-1">Percussão</span></button>
