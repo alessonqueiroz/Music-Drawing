@@ -159,12 +159,10 @@ function animatePlayhead() {
     const elapsedTime = state.audioCtx.currentTime - state.playbackStartTime;
     const currentX = state.playbackStartScroll + (elapsedTime * PIXELS_PER_SECOND);
     
-    // Usa transform para mover o playhead. É mais performático que 'left'.
     uiElements.playhead.style.transform = `translateX(${currentX}px)`;
 
-    // Se a cabeça de leitura chegar ao fim da visualização, role a tela
-    if (currentX > uiElements.mainCanvasArea.scrollLeft + uiElements.mainCanvasArea.clientWidth * 0.8) {
-        uiElements.mainCanvasArea.scrollLeft = currentX - uiElements.mainCanvasArea.clientWidth * 0.8;
+    if (currentX > uiElements.mainCanvasArea.scrollLeft + uiElements.mainCanvasArea.clientWidth * 10.0) {
+        uiElements.mainCanvasArea.scrollLeft = currentX - uiElements.mainCanvasArea.clientWidth * 10.0;
     }
 
     if (currentX >= uiElements.drawingCanvas.width) {
@@ -172,7 +170,7 @@ function animatePlayhead() {
         return;
     }
     
-    // CORREÇÃO: A função deve chamar a si mesma para criar o loop
+    // CORREÇÃO: A função agora chama a si mesma para criar o loop de animação.
     state.animationFrameId = requestAnimationFrame(animatePlayhead);
 }
 
@@ -191,7 +189,7 @@ function initializeApplication(mode = 'pc') {
     }
     if (appWrapper) {
         appWrapper.classList.remove('hidden');
-        appWrapper.classList.add('w-full', 'h-full');
+        // As classes 'w-full' e 'h-full' já estão no HTML, não precisa adicionar aqui
     }
 
     if (mode === 'mobile') {
@@ -207,11 +205,16 @@ function initializeApplication(mode = 'pc') {
 document.addEventListener('DOMContentLoaded', () => {
     const pcModeBtn = document.getElementById('pc-mode-btn');
     const mobileModeBtn = document.getElementById('mobile-mode-btn');
+    const appWrapper = document.getElementById('app-wrapper'); // Pega o wrapper principal
 
     if (pcModeBtn && mobileModeBtn) {
+        // Esconde o app principal inicialmente
+        if (appWrapper) appWrapper.classList.add('hidden'); 
+        
         pcModeBtn.addEventListener('click', () => initializeApplication('pc'));
         mobileModeBtn.addEventListener('click', () => initializeApplication('mobile'));
     } else {
+        // Se a tela de seleção não existir, inicializa o app diretamente
         initializeApplication();
     }
 });
