@@ -48,7 +48,7 @@ body { background-color: var(--bg-dark); color: var(--text-light); font-family: 
 .mode-btn:hover { transform: translateY(-3px); box-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow); background-color: rgba(169, 114, 255, 0.1); }
 
 /* ==========================================================================
-   4. Layout da Aplicação
+   4. Layout da Aplicação (PC)
    ========================================================================== */
 .app-container {
     background: var(--bg-dark-accent);
@@ -66,40 +66,40 @@ header {
     flex-grow: 1;
     min-height: 0;
 }
-
 aside { 
     background-color: var(--bg-dark-sidebar); 
     border-color: var(--border-color-dark) !important; 
     flex-shrink: 0;
+    overflow-y: auto;
+    display: flex; /* Added for PC layout consistency */
+    flex-direction: column;
 }
-
 main#canvas-wrapper {
     display: grid;
-    grid-template-areas:
-        "y-ruler main-canvas"
-        "corner x-ruler";
+    grid-template-areas: "y-ruler main-canvas" "corner x-ruler";
     grid-template-rows: 1fr auto;
     grid-template-columns: auto 1fr;
     flex-grow: 1;
     min-width: 0;
 }
-
 #main-canvas-area {
     grid-area: main-canvas;
     position: relative;
-    overflow: auto; /* Ensures scrollbars appear when content overflows */
+    overflow: auto;
     min-width: 0;
     min-height: 0;
 }
 
-.title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
-.subtitle-color { color: var(--text-dark); }
-.sidebar-title { font-weight: 600; text-align: center; margin-bottom: 0.75rem; color: var(--text-dark); }
-.sidebar-section { background-color: rgba(128, 128, 128, 0.05); padding: 0.75rem; border-radius: 12px; }
+/* Hide mobile-only elements on PC */
+#mobile-toolbar-tabs { display: none; }
 
 /* ==========================================================================
    5. Componentes e Playhead
    ========================================================================== */
+.title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
+.subtitle-color { color: var(--text-dark); }
+.sidebar-section { background-color: rgba(128, 128, 128, 0.05); padding: 0.75rem; border-radius: 12px; }
+.sidebar-title { font-weight: 600; text-align: center; margin-bottom: 0.75rem; color: var(--text-dark); }
 .tool-btn, .timbre-btn, .play-btn, .danger-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 8px; border-radius: 8px; border: 1px solid transparent; background-color: rgba(169, 114, 255, 0.1); color: var(--text-dark); font-weight: 500; transition: all 0.2s ease; cursor: pointer; }
 .tool-btn:hover, .timbre-btn:hover, .danger-btn:hover { color: var(--text-light); border-color: var(--primary-glow); background-color: rgba(169, 114, 255, 0.2); }
 .tool-btn.active, .timbre-btn.active { color: white; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); }
@@ -124,36 +124,64 @@ input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
 #drawingCanvas, #y-ruler-canvas, #x-ruler-canvas { display: block; background-color: var(--bg-dark); }
 #y-ruler-canvas, #x-ruler-canvas { height: 100%; width: 100%; }
 #playhead { width: 2px; height: 100%; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); position: absolute; top: 0; left: 0; transform: translateX(0); z-index: 5; pointer-events: none; }
-
-.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.2); border-radius: 10px; }
-.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(169, 114, 255, 0.4); }
-
-#main-canvas-area::-webkit-scrollbar { width: 8px; height: 8px; }
-#main-canvas-area::-webkit-scrollbar-track { background: var(--bg-dark-accent); }
-#main-canvas-area::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.4); border-radius: 10px; border: 2px solid var(--bg-dark-accent); }
-#main-canvas-area::-webkit-scrollbar-thumb:hover { background: var(--primary-glow); }
-
 #loading-overlay .loader { width: 60px; height: 60px; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
-   6. Responsividade (Mobile Mode)
+   6. Modo Mobile (Reestruturado)
    ========================================================================== */
-/* REMOVED @media query wrapper to force mobile layout when class is present */
 body.mobile-mode .app-body { flex-direction: column; }
-body.mobile-mode aside { order: 2; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-around; overflow-y: auto; max-height: 45vh; padding: 8px; border-top: 1px solid var(--border-color-dark); border-right: none; }
+body.mobile-mode aside {
+    order: 2;
+    width: 100%;
+    height: auto;
+    max-height: 40vh;
+    padding: 8px;
+    border-top: 1px solid var(--border-color-dark);
+    border-right: none;
+    overflow-y: hidden;
+}
 body.mobile-mode main#canvas-wrapper { order: 1; flex-grow: 1; }
-body.mobile-mode .sidebar-section { padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1; min-width: 150px; background-color: var(--bg-dark-sidebar); }
-body.mobile-mode .sidebar-title { font-size: 0.8rem; }
-body.mobile-mode .tool-btn { height: 50px; width: 100%; font-size: 0.7rem; flex-direction: row; }
-body.mobile-mode .tool-btn svg { width: 20px; height: 20px; }
-body.mobile-mode .tool-btn span { display: inline; }
-body.mobile-mode header { padding: 8px 12px; flex-wrap: nowrap; align-items: center;}
+body.mobile-mode #panels-container { overflow-y: auto; position: relative; flex-grow: 1; padding-bottom: 8px;}
+body.mobile-mode #mobile-toolbar-tabs { display: flex; flex-shrink: 0; gap: 4px; margin-bottom: 8px; }
+body.mobile-mode .toolbar-tab {
+    flex-grow: 1;
+    padding: 8px 4px;
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dark);
+    font-size: 0.9rem;
+    transition: all 0.2s ease;
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight on mobile */
+}
+body.mobile-mode .toolbar-tab.active { color: var(--primary-glow); border-bottom-color: var(--primary-glow); font-weight: 600; }
+body.mobile-mode .toolbar-panel { display: none; }
+body.mobile-mode .toolbar-panel.active { display: block; }
+
+/* Hide/show elements for mobile */
+body.mobile-mode .sidebar-title { display: none; }
+body.mobile-mode .sidebar-section { padding: 4px; background-color: transparent; }
 body.mobile-mode header h1 { font-size: 1rem; flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 body.mobile-mode header p, body.mobile-mode #exportBtn span, body.mobile-mode #saveProjectBtn span, body.mobile-mode #importProjectBtn span { display: none; }
 body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width: 100%; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); }
+
+/* Restructure mobile controls */
+body.mobile-mode .tool-btn.flex-col {
+    height: auto;
+    width: auto;
+    font-size: 0.65rem;
+    padding: 8px 4px;
+    flex-direction: column;
+}
+body.mobile-mode .tool-btn.flex-col svg { width: 24px; height: 24px; margin-bottom: 4px; }
+body.mobile-mode .tool-btn.flex-col span { display: inline; margin-top: 0; }
+body.mobile-mode [data-panel="tools"] .grid { grid-template-columns: repeat(auto-fill, minmax(70px, 1fr)); gap: 8px; }
+body.mobile-mode [data-panel="timbres"] .grid { grid-template-columns: repeat(auto-fill, minmax(85px, 1fr)); gap: 8px; }
+body.mobile-mode .timbre-btn { padding: 12px 8px; font-size: 0.8rem; }
+body.mobile-mode .danger-btn { margin-top: 8px; flex-shrink: 0; }
+
+/* Mobile Canvas/Ruler dimensions */
 body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 25px; grid-template-columns: 40px 1fr; }
 body.mobile-mode #y-ruler-container { width: 40px; }
 body.mobile-mode #x-ruler-container { height: 25px; }
