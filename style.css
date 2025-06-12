@@ -39,7 +39,7 @@
 body { background-color: var(--bg-dark); color: var(--text-light); font-family: 'Poppins', sans-serif; transition: background-color 0.3s, color 0.3s; overflow: hidden; }
 .hidden { display: none !important; }
 #selection-container { background-color: var(--bg-dark); }
-.background-animation { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+.background-animation { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; overflow: hidden; }
 .background-animation::before { content: ''; position: absolute; width: 400px; height: 400px; background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow)); border-radius: 50%; filter: blur(150px); opacity: 0.5; animation: move-glow 15s linear infinite alternate; }
 @keyframes move-glow { from { transform: translate(-10vw, -20vh) scale(1); } to { transform: translate(60vw, 40vh) scale(1.2); } }
 .selection-box { position: relative; z-index: 2; background: var(--bg-dark-glass); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid var(--border-color-dark); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
@@ -87,11 +87,9 @@ main#canvas-wrapper {
 #main-canvas-area {
     grid-area: main-canvas;
     position: relative;
-    overflow: auto;
+    overflow: auto; /* Ensures scrollbars appear when content overflows */
     min-width: 0;
     min-height: 0;
-    scrollbar-width: thin; 
-    scrollbar-color: rgba(169, 114, 255, 0.4) transparent;
 }
 
 .title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
@@ -143,18 +141,22 @@ input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
 /* ==========================================================================
    6. Responsividade (Mobile Mode)
    ========================================================================== */
-body.mobile-mode .app-body { flex-direction: column; }
-body.mobile-mode aside { order: 2; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-between; overflow-y: auto; max-height: 50vh; padding: 8px; border-top: 1px solid var(--border-color-dark); border-right: none; }
-body.mobile-mode main#canvas-wrapper { order: 1; }
-body.mobile-mode .sidebar-section { padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1; min-width: 150px; background-color: var(--bg-dark-sidebar); }
-body.mobile-mode .sidebar-title { font-size: 0.8rem; }
-body.mobile-mode .tool-btn { height: 50px; width: 100%; font-size: 0.7rem; flex-direction: row; }
-body.mobile-mode .tool-btn svg { width: 20px; height: 20px; }
-body.mobile-mode .tool-btn span { display: inline; }
-body.mobile-mode header { padding: 8px; flex-wrap: nowrap; }
-body.mobile-mode header h1 { font-size: 1rem; }
-body.mobile-mode header p, body.mobile-mode #exportBtn span { display: none; }
-body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width: 100%; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); }
-body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 20px; grid-template-columns: 35px 1fr; }
-body.mobile-mode #y-ruler-container { width: 35px; }
-body.mobile-mode #x-ruler-container { height: 20px; }
+@media (max-width: 768px) {
+    body.mobile-mode .app-body { flex-direction: column; }
+    body.mobile-mode aside { order: 2; width: 100%; height: auto; flex-direction: row; flex-wrap: wrap; justify-content: space-around; overflow-y: auto; max-height: 45vh; padding: 8px; border-top: 1px solid var(--border-color-dark); border-right: none; }
+    body.mobile-mode main#canvas-wrapper { order: 1; flex-grow: 1; }
+    body.mobile-mode .sidebar-section { padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1; min-width: 150px; background-color: var(--bg-dark-sidebar); }
+    body.mobile-mode .sidebar-title { font-size: 0.8rem; }
+    body.mobile-mode .tool-btn { height: 50px; width: 100%; font-size: 0.7rem; flex-direction: row; }
+    body.mobile-mode .tool-btn svg { width: 20px; height: 20px; }
+    body.mobile-mode .tool-btn span { display: inline; }
+    body.mobile-mode header { padding: 8px 12px; flex-wrap: nowrap; align-items: center;}
+    body.mobile-mode header h1 { font-size: 1rem; flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    body.mobile-mode header p, body.mobile-mode #exportBtn span { display: none; }
+    body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width: 100%; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); }
+    body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 25px; grid-template-columns: 40px 1fr; }
+    body.mobile-mode #y-ruler-container { width: 40px; }
+    body.mobile-mode #x-ruler-container { height: 25px; }
+    body.mobile-mode .play-btn { padding: 8px 12px; }
+    body.mobile-mode #playBtnText { font-size: 0.9rem;}
+}
