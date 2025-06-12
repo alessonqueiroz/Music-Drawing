@@ -1,0 +1,170 @@
+/* ==========================================================================
+   1. Variáveis e Tema
+   ========================================================================== */
+:root {
+    --primary-glow: #a972ff;
+    --secondary-glow: #639fff;
+    --danger-glow: #ff72a1;
+    --bg-dark: #050210;
+    --bg-dark-glass: rgba(10, 5, 30, 0.3);
+    --bg-dark-sidebar: rgba(10, 5, 30, 0.1);
+    --bg-dark-accent: #110d21;
+    --text-light: #f0f0f0;
+    --text-dark: #c0c0c0;
+    --border-color-dark: rgba(169, 114, 255, 0.2);
+    --play-btn-bg: var(--secondary-glow);
+    --play-btn-hover: #8cbaff;
+}
+
+[data-theme="light"] {
+    --primary-glow: #6d28d9;
+    --secondary-glow: #2563eb;
+    --danger-glow: #e11d48;
+    --bg-dark: #f9fafb;
+    --bg-dark-glass: rgba(255, 255, 255, 0.3);
+    --bg-dark-sidebar: rgba(255, 255, 255, 0.1);
+    --bg-dark-accent: #f3f4f6;
+    --text-light: #1f2937;
+    --text-dark: #4b5563;
+    --border-color-dark: rgba(109, 40, 217, 0.3);
+    --play-btn-bg: var(--secondary-glow);
+    --play-btn-hover: #4f80ee;
+}
+
+/* ==========================================================================
+   2. Estilos Base
+   ========================================================================== */
+body {
+    background-color: var(--bg-dark);
+    color: var(--text-light);
+    font-family: 'Poppins', sans-serif;
+    transition: background-color 0.3s, color 0.3s;
+    overflow: hidden;
+}
+.hidden { display: none !important; }
+
+/* ==========================================================================
+   3. Tela de Seleção
+   ========================================================================== */
+#selection-container { background-color: var(--bg-dark); }
+.background-animation { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+.background-animation::before {
+    content: ''; position: absolute; width: 400px; height: 400px;
+    background: linear-gradient(45deg, var(--primary-glow), var(--secondary-glow));
+    border-radius: 50%; filter: blur(150px); opacity: 0.5;
+    animation: move-glow 15s linear infinite alternate;
+}
+@keyframes move-glow {
+    from { transform: translate(-10vw, -20vh) scale(1); }
+    to { transform: translate(60vw, 40vh) scale(1.2); }
+}
+.selection-box {
+    position: relative; z-index: 2; background: var(--bg-dark-glass);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color-dark);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+.selection-box h1 { text-shadow: 0 0 15px var(--primary-glow); }
+.mode-btn {
+    font-size: 1rem; font-weight: 400; cursor: pointer;
+    border: 1px solid var(--primary-glow); border-radius: 50px;
+    background-color: transparent; color: var(--text-light);
+    transition: all 0.3s ease; padding: 15px 35px;
+}
+.mode-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 0 15px var(--primary-glow), 0 0 30px var(--secondary-glow);
+    background-color: rgba(169, 114, 255, 0.1);
+}
+
+/* ==========================================================================
+   4. Layout da Aplicação
+   ========================================================================== */
+.app-container {
+    background: var(--bg-dark-accent);
+    border: 1px solid var(--border-color-dark);
+    box-shadow: 0 500px 400px rgba(0,0,0,0.4);
+}
+header { border-color: var(--border-color-dark) !important; }
+aside { background-color: var(--bg-dark-sidebar); border-color: var(--border-color-dark) !important; }
+.title-accent { color: var(--primary-glow); text-shadow: 0 0 8px var(--primary-glow); }
+.subtitle-color { color: var(--text-dark); }
+.sidebar-title { font-weight: 600; text-align: center; margin-bottom: 0.75rem; color: var(--text-dark); }
+#drawingCanvas { background-color: var(--bg-dark); }
+
+/* ==========================================================================
+   5. Componentes da Aplicação
+   ========================================================================== */
+.tool-btn, .timbre-btn, .play-btn, .danger-btn {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; padding: 8px; border-radius: 8px;
+    border: 1px solid transparent; background-color: rgba(169, 114, 255, 0.1);
+    color: var(--text-dark); font-weight: 500;
+    transition: all 0.2s ease; cursor: pointer;
+}
+.tool-btn:hover, .timbre-btn:hover, .danger-btn:hover {
+    color: var(--text-light); border-color: var(--primary-glow);
+    background-color: rgba(169, 114, 255, 0.2);
+}
+.tool-btn.active, .timbre-btn.active {
+    color: white; background-color: var(--primary-glow);
+    box-shadow: 0 0 10px var(--primary-glow);
+}
+.tool-btn.primary { background-color: var(--primary-glow); color: white; }
+.tool-btn.primary:hover { background-color: #c084fc; } /* Lighter purple */
+
+.play-btn { background-color: var(--play-btn-bg); color: white; padding: 8px 16px; font-weight: 600; }
+.play-btn:hover { background-color: var(--play-btn-hover); }
+
+.danger-btn { background-color: transparent; border: 1px solid var(--danger-glow); color: var(--danger-glow); }
+.danger-btn:hover { background-color: rgba(255, 114, 161, 0.1); box-shadow: 0 0 10px var(--danger-glow); }
+
+button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+input[type="range"] { accent-color: var(--primary-glow); }
+input[type="color"] { width: 100%; height: 40px; border: 1px solid var(--border-color-dark); border-radius: 8px; cursor: pointer; }
+input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
+
+/* Dropdown */
+.dropdown { position: relative; }
+.dropdown-content { display: none; position: absolute; right: 0; background-color: var(--bg-dark-accent); min-width: 160px; box-shadow: 0px 8px 16px rgba(0,0,0,0.3); z-index: 10; border-radius: 8px; overflow: hidden; border: 1px solid var(--border-color-dark); }
+.dropdown:hover .dropdown-content { display: block; }
+.dropdown-content button { color: var(--text-light); padding: 12px 16px; width: 100%; text-align: left; background: none; border: none; }
+.dropdown-content button:hover { background-color: rgba(169, 114, 255, 0.1); }
+
+/* Canvas e Rulers */
+#canvas-wrapper { grid-template-columns: 35px 1fr; grid-template-rows: 1fr 20px; }
+#playhead { width: 2px; background-color: var(--danger-glow); box-shadow: 0 0 10px var(--danger-glow); }
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar { width: 8px; height: 8px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(169, 114, 255, 0.2); border-radius: 10px; }
+.custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(169, 114, 255, 0.4); }
+
+/* Loader */
+#loading-overlay .loader { border-top-color: var(--primary-glow); }
+
+/* ==========================================================================
+   6. Responsividade (Mobile Mode)
+   ========================================================================== */
+body.mobile-mode .app-container { flex-direction: column; height: 100%; }
+body.mobile-mode aside {
+    order: 2; width: 100%; height: auto;
+    flex-direction: row; flex-wrap: wrap; justify-content: center;
+    overflow-y: auto; max-height: 40vh; padding: 8px;
+    border-top: 1px solid var(--border-color-dark); border-right: none;
+}
+body.mobile-mode main { order: 1; padding: 0; height: 100%; }
+body.mobile-mode .sidebar-section {
+    padding: 8px; border-radius: 12px; margin: 4px; flex-grow: 1;
+    background-color: var(--bg-dark-sidebar);
+}
+body.mobile-mode .sidebar-title { font-size: 0.8rem; }
+body.mobile-mode .tool-btn { height: 50px; width: 50px; font-size: 0.7rem; }
+body.mobile-mode header { padding: 8px; flex-wrap: nowrap; }
+body.mobile-mode header h1 { font-size: 1rem; }
+body.mobile-mode header p, body.mobile-mode #exportBtn span { display: none; }
+body.mobile-mode .dropdown-content {
+    position: fixed; bottom: 0; left: 0; width: 100%;
+    border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2);
+}

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Desenhe sua música em uma pauta interativa com a Web Audio API.">
+    <meta name="author" content="Alesson Queiroz">
+    <title>Music Drawing v2.0</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="flex flex-col items-center justify-center h-screen p-2 md:p-4">
+
+    <div class="app-container w-full h-full flex flex-col rounded-2xl shadow-2xl overflow-hidden">
+        <header class="p-4 border-b flex justify-between items-center flex-shrink-0 flex-wrap gap-4">
+            <div>
+                <h1 class="text-xl md:text-2xl font-bold title-accent">Music Drawing <span class="text-base font-normal align-middle subtitle-color">v2.0</span></h1>
+                <p class="text-xs md:text-sm subtitle-color">Desenhe sua música! © Desenvolvido por Alesson Queiroz</p>
+            </div>
+            <div class="flex items-center gap-2 md:gap-4">
+                <button id="undoBtn" class="tool-btn" title="Desfazer (Ctrl+Z)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13v-2.2A4.8 4.8 0 0 0 16.2 6H5M4 8l-3 3 3 3"/></svg></button>
+                <button id="redoBtn" class="tool-btn" title="Refazer (Ctrl+Y)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13v-2.2A4.8 4.8 0 0 1 7.8 6H19M20 8l3 3-3 3"/></svg></button>
+                
+                <div class="dropdown">
+                    <button id="exportBtn" class="tool-btn primary" title="Exportar"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span class="hidden md:inline">Exportar</span></button>
+                    <div id="export-menu" class="dropdown-content">
+                        <button id="exportJpgBtn">Exportar JPG</button>
+                        <button id="exportPdfBtn">Exportar PDF</button>
+                        <button id="exportWavBtn">Exportar WAV</button>
+                    </div>
+                </div>
+
+                <button id="theme-toggle" class="tool-btn" title="Alternar Tema"><svg id="theme-icon-sun" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /></svg><svg id="theme-icon-moon" class="h-6 w-6 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" /></svg></button>
+                <button id="playBtn" class="play-btn"><svg id="playIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg><svg id="pauseIcon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" class="hidden"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg><span>Tocar</span></button>
+            </div>
+        </header>
+
+        <div class="flex flex-grow h-full min-h-0">
+            <aside class="p-4 border-r flex flex-col gap-2 flex-shrink-0 w-64 overflow-y-auto custom-scrollbar">
+                </aside>
+            <main class="flex-grow relative p-2 md:p-4" id="canvas-wrapper">
+                 <div id="y-ruler-container" class="absolute top-0 left-0 h-full"><canvas id="y-ruler-canvas"></canvas></div>
+                 <div id="main-canvas-area" class="relative overflow-auto custom-scrollbar">
+                     <div id="canvas-container" class="relative h-full">
+                         <canvas id="drawingCanvas"></canvas>
+                         <div id="playhead" class="hidden"></div>
+                     </div>
+                 </div>
+                 <div id="x-ruler-container" class="absolute bottom-0 right-0 w-full overflow-hidden"><canvas id="x-ruler-canvas"></canvas></div>
+            </main>
+        </div>
+    </div>
+    
+    <div id="loading-overlay" class="hidden">
+        <div class="loader"></div>
+        <p>Renderizando áudio...</p>
+    </div>
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
