@@ -157,7 +157,7 @@ function drawRulers() {
         const xPos = sec * PIXELS_PER_SECOND;
         if (sec % interval === 0) {
             // Alterado para desenhar uma LINHA de 1px de largura para a marcação principal
-            xRulerCtx.fillRect(xPos, 0, 1, 10);
+            xRulerCtx.fillRect(xPos, 0, 1, 2);
             xRulerCtx.fillText(`${sec}seg.`, xPos, 8);
         } else if (sec % 1 === 0) {
             // Alterado para desenhar uma LINHA de 1px para as marcações secundárias
