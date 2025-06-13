@@ -1,4 +1,3 @@
-// app/js/main.js - Lógica Unificada e Funcional
 const d = document;
 const { jsPDF } = window.jspdf;
 
@@ -9,6 +8,9 @@ const FREQ_MIN = 100;
 const FREQ_MAX = 2000;
 const ERASE_RADIUS = 20;
 const AUTOSAVE_KEY = 'music-drawing-autosave';
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4.0;
+const ZOOM_STEP = 0.1;
 
 // --- DOM ELEMENTS ---
 const el = {
@@ -28,6 +30,8 @@ const el = {
 
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
+    zoomInBtn: d.getElementById('zoomInBtn'), // NEW
+    zoomOutBtn: d.getElementById('zoomOutBtn'), // NEW
     
     canvas: d.getElementById('drawingCanvas'),
     canvasContainer: d.getElementById('canvas-container'),
@@ -37,7 +41,7 @@ const el = {
     xRulerContainer: d.getElementById('x-ruler-container'),
     yRulerContainer: d.getElementById('y-ruler-container'),
 
-    tools: { pencil: d.getElementById('pencil'), eraser: d.getElementById('eraser'), hand: d.getElementById('hand'), glissando: d.getElementById('glissando'), staccato: d.getElementById('staccato'), percussion: d.getElementById('percussion'), arpeggio: d.getElementById('arpeggio'), granular: d.getElementById('granular'), tremolo: d.getElementById('tremolo'), filter: d.getElementById('filter'), delay: d.getElementById('delay') },
+    tools: { select: d.getElementById('select'), pencil: d.getElementById('pencil'), eraser: d.getElementById('eraser'), hand: d.getElementById('hand'), glissando: d.getElementById('glissando'), staccato: d.getElementById('staccato'), percussion: d.getElementById('percussion'), arpeggio: d.getElementById('arpeggio'), granular: d.getElementById('granular'), tremolo: d.getElementById('tremolo'), filter: d.getElementById('filter'), delay: d.getElementById('delay') },
     timbres: { sine: d.getElementById('sine'), square: d.getElementById('square'), sawtooth: d.getElementById('sawtooth'), triangle: d.getElementById('triangle'), fm: d.getElementById('fm'), pulse: d.getElementById('pulse') }
 };
 
@@ -48,6 +52,10 @@ const xRulerCtx = el.xRulerCanvas.getContext('2d');
 // --- STATE MANAGEMENT ---
 let state = {
     isDrawing: false,
+    isSelecting: false, 
+    isMoving: false,
+    selectionStart: null,
+    selectionEnd: null,  
     activeTool: 'pencil',
     activeTimbre: 'sine',
     lastPos: { x: 0, y: 0 },
@@ -58,13 +66,16 @@ let state = {
     sourceNodes: [],
     composition: { strokes: [], symbols: [] },
     history: [],
-    historyIndex: -1
+    historyIndex: -1,
+    selectedElements: [],
+    zoomLevel: 1.0, // NEW
 };
+let clipboard = [];
 
 // --- CORE FUNCTIONS ---
 
 function initApp(mode = 'pc') {
-        const backgroundAudio = d.getElementById('background-audio');
+    const backgroundAudio = d.getElementById('background-audio');
     if (backgroundAudio && !backgroundAudio.paused) {
         backgroundAudio.pause();
         backgroundAudio.currentTime = 0; }
@@ -76,7 +87,7 @@ function initApp(mode = 'pc') {
         setupMobileToolbar();
     }
     
-    loadAutoSavedProject(); // Check for autosaved project
+    loadAutoSavedProject();
     setupEventListeners();
     applyTheme(localStorage.getItem('music-drawing-theme') || 'dark');
     setActiveTool('pencil');
@@ -85,7 +96,7 @@ function initApp(mode = 'pc') {
     setTimeout(() => {
         resizeAndRedraw();
         if (state.history.length === 0) {
-            saveState(true); // Save initial empty state
+            saveState(true);
         }
     }, 100);
 }
@@ -114,7 +125,12 @@ function resizeAndRedraw() {
 }
 
 function redrawAll() {
-    ctx.clearRect(0, 0, el.canvas.width, el.canvas.height);
+    ctx.clearRect(0, 0, el.canvas.width / state.zoomLevel, el.canvas.height / state.zoomLevel);
+    
+    // Apply zoom transformation
+    ctx.save();
+    ctx.scale(state.zoomLevel, state.zoomLevel);
+
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
         ctx.beginPath();
@@ -129,44 +145,77 @@ function redrawAll() {
         ctx.stroke();
     });
     state.composition.symbols.forEach(s => drawSymbol(s));
+    
+    if (state.isSelecting) {
+        drawMarquee();
+    }
+
+    state.selectedElements.forEach(elementId => {
+        const element = findElementById(elementId);
+        if (element) {
+            drawSelectionIndicator(element);
+        }
+    });
+
+    ctx.restore(); // Restore from zoom
     drawRulers();
 }
 
 function drawRulers() {
+    // Clear rulers
+    xRulerCtx.clearRect(0, 0, el.xRulerCanvas.width, el.xRulerCanvas.height);
+    yRulerCtx.clearRect(0, 0, el.yRulerCanvas.width, el.yRulerCanvas.height);
+
+    // Get styles
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
     const rulerFont = '9px Inter';
+
+    // X-Ruler (Time)
+    xRulerCtx.fillStyle = textColor;
+    xRulerCtx.font = rulerFont;
+    xRulerCtx.textAlign = 'center';
+    xRulerCtx.textBaseline = 'top';
+
+    const xScroll = el.mainCanvasArea.scrollLeft;
+    const xZoom = state.zoomLevel;
+    const startSec = Math.floor(xScroll / (PIXELS_PER_SECOND * xZoom));
+    const endSec = Math.ceil((xScroll + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
     
-    yRulerCtx.clearRect(0, 0, el.yRulerCanvas.width, el.yRulerCanvas.height);
+    for (let sec = startSec; sec <= endSec; sec++) {
+        const xPos = (sec * PIXELS_PER_SECOND * xZoom) - xScroll;
+        
+        let isMajorTick = false;
+        if (xZoom > 2) isMajorTick = (sec % 1 === 0);
+        else if (xZoom > 0.5) isMajorTick = (sec % 5 === 0);
+        else isMajorTick = (sec % 10 === 0);
+
+        if (isMajorTick) {
+            xRulerCtx.fillRect(xPos, 0, 1, 10);
+            xRulerCtx.fillText(`${sec}s`, xPos, 12);
+        } else {
+             xRulerCtx.fillRect(xPos, 0, 1, 5);
+        }
+    }
+
+    // Y-Ruler (Frequency)
     yRulerCtx.fillStyle = textColor;
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
     yRulerCtx.textBaseline = 'middle';
     
-    for(let freq = FREQ_MIN; freq <= FREQ_MAX; freq += 100) {
-        if (freq % 200 !== 0 && freq !== FREQ_MIN) continue;
-        const yPos = yFromFrequency(freq);
-        if (yPos > 0 && yPos < el.canvas.height) {
-            yRulerCtx.fillRect(el.yRulerCanvas.width - 10, yPos, 10, 1);
-            yRulerCtx.fillText(`${Math.round(freq)}`, el.yRulerCanvas.width - 15, yPos);
-        }
-    }
+    const yScroll = el.mainCanvasArea.scrollTop;
+    const yZoom = state.zoomLevel;
 
-    xRulerCtx.clearRect(0, 0, el.xRulerCanvas.width, el.xRulerCanvas.height);
-    xRulerCtx.fillStyle = textColor;
-    xRulerCtx.font = rulerFont;
-    xRulerCtx.textAlign = 'center';
-    xRulerCtx.textBaseline = 'top';
-    
-    const interval = window.innerWidth < 768 ? 10 : 5; // Wider spacing on mobile
-    for (let sec = 0; sec <= MAX_DURATION_SECONDS; sec++) {
-        const xPos = sec * PIXELS_PER_SECOND;
-        if (sec % interval === 0) {
-            // Alterado para desenhar uma LINHA de 1px de largura para a marcação principal
-            xRulerCtx.fillRect(xPos, 0, 1, 2);
-            xRulerCtx.fillText(`${sec}seg.`, xPos, 8);
-        } else if (sec % 1 === 0) {
-            // Alterado para desenhar uma LINHA de 1px para as marcações secundárias
-            xRulerCtx.fillRect(xPos, 0, 1, 5);
+    for(let freq = FREQ_MIN; freq <= FREQ_MAX; freq += 50) {
+        const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
+        
+        if (yPos > 0 && yPos < el.mainCanvasArea.offsetHeight) {
+            if (freq % 200 === 0) {
+                yRulerCtx.fillRect(el.yRulerCanvas.width - 15, yPos, 15, 1);
+                yRulerCtx.fillText(`${Math.round(freq)}`, el.yRulerCanvas.width - 20, yPos);
+            } else if (yZoom > 1.5 && freq % 100 === 0) {
+                 yRulerCtx.fillRect(el.yRulerCanvas.width - 10, yPos, 10, 1);
+            }
         }
     }
 }
@@ -174,8 +223,8 @@ function drawRulers() {
 // --- EVENT HANDLING ---
 function setupEventListeners() {
     window.addEventListener('resize', resizeAndRedraw);
-    el.mainCanvasArea.addEventListener('scroll', syncScroll);
-
+    el.mainCanvasArea.addEventListener('scroll', redrawAll); // Redraw on scroll for rulers
+    
     const canvasEvents = {
         'mousedown': startAction, 'mouseup': stopAction, 'mouseleave': stopAction, 'mousemove': performAction,
         'touchstart': startAction, 'touchend': stopAction, 'touchcancel': stopAction, 'touchmove': performAction
@@ -191,6 +240,10 @@ function setupEventListeners() {
     Object.keys(el.tools).forEach(key => el.tools[key]?.addEventListener('click', () => setActiveTool(key)));
     Object.keys(el.timbres).forEach(key => el.timbres[key]?.addEventListener('click', () => setActiveTimbre(key)));
     
+    // Zoom buttons
+    el.zoomInBtn.addEventListener('click', () => handleZoom(true));
+    el.zoomOutBtn.addEventListener('click', () => handleZoom(false));
+
     el.saveProjectBtn.addEventListener('click', saveProject);
     el.importProjectBtn.addEventListener('click', () => el.musdrImporter.click());
     el.musdrImporter.addEventListener('change', importProject);
@@ -201,64 +254,104 @@ function setupEventListeners() {
 
     el.undoBtn.addEventListener('click', undo);
     el.redoBtn.addEventListener('click', redo);
+    
     window.addEventListener('keydown', e => {
-        if (e.ctrlKey || e.metaKey) {
-            if (e.key === 'z') { e.preventDefault(); undo(); }
-            if (e.key === 'y') { e.preventDefault(); redo(); }
-            if (e.key === 's') { e.preventDefault(); saveProject(); }
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        const isCtrlCmd = e.ctrlKey || e.metaKey;
+
+        if (isCtrlCmd && (e.key === '+' || e.key === '=')) {
+            e.preventDefault();
+            handleZoom(true);
+        } else if (isCtrlCmd && e.key === '-') {
+            e.preventDefault();
+            handleZoom(false);
+        } else if (isCtrlCmd && e.key.toLowerCase() === 'c') {
+            e.preventDefault();
+            copySelectedElements();
+        } else if (isCtrlCmd && e.key.toLowerCase() === 'v') {
+            e.preventDefault();
+            pasteElements();
+        } else if (isCtrlCmd && e.key === 'z') { 
+            e.preventDefault(); 
+            undo(); 
+        } else if (isCtrlCmd && e.key === 'y') { 
+            e.preventDefault(); 
+            redo(); 
+        } else if (isCtrlCmd && e.key === 's') { 
+            e.preventDefault(); 
+            saveProject(); 
+        } else if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            deleteSelectedElements();
+        } else if (e.key === ' ' && e.target === d.body) {
+            e.preventDefault(); 
+            togglePlayback();
         }
-        if (e.key === ' ' && e.target === d.body) { e.preventDefault(); togglePlayback(); }
-    });
-}
-
-function setupMobileToolbar() {
-    const tabs = d.querySelectorAll('.toolbar-tab');
-    const panels = d.querySelectorAll('.toolbar-panel');
-
-    tabs.forEach(tab => {
-        tab.addEventListener('click', () => {
-            // Deactivate all
-            tabs.forEach(t => t.classList.remove('active'));
-            panels.forEach(p => p.classList.remove('active'));
-
-            // Activate clicked tab and its corresponding panel
-            tab.classList.add('active');
-            const targetPanelId = tab.dataset.tab;
-            const targetPanel = d.querySelector(`.toolbar-panel[data-panel="${targetPanelId}"]`);
-            if (targetPanel) {
-                targetPanel.classList.add('active');
-            }
-        });
     });
 }
 
 function getEventPos(e) {
-    const rect = el.canvas.getBoundingClientRect();
+    const rect = el.mainCanvasArea.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: clientX - rect.left, y: clientY - rect.top };
+    
+    // Translate viewport coordinates to canvas-data coordinates
+    const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
+    
+    return { x, y };
 }
+
+// ... (Rest of the functions from previous steps: startAction, stopAction, performAction, etc.)
+// ... (All other helper functions for selection, copy/paste, drawing, audio also remain)
+// The following are the key modified functions for brevity.
 
 function startAction(e) {
     e.preventDefault();
     initAudio();
-    
     const pos = getEventPos(e);
-    
+    state.lastPos = pos;
+    state.isDrawing = true;
+
     switch (state.activeTool) {
+        case 'select': {
+            const clickedElement = getElementAtPos(pos);
+            const isAlreadySelected = clickedElement && state.selectedElements.includes(clickedElement.id);
+
+            if (isAlreadySelected) {
+                state.isMoving = true;
+                el.canvas.style.cursor = 'move';
+            } else {
+                state.isMoving = false;
+                const isMultiSelect = e.ctrlKey || e.metaKey;
+                if (clickedElement) {
+                    state.isSelecting = false;
+                    if (isMultiSelect) {
+                        state.selectedElements.push(clickedElement.id);
+                    } else {
+                        state.selectedElements = [clickedElement.id];
+                    }
+                } else {
+                    state.isSelecting = true;
+                    state.selectionStart = pos;
+                    state.selectionEnd = pos;
+                    if (!isMultiSelect) {
+                        state.selectedElements = [];
+                    }
+                }
+            }
+            redrawAll();
+            break;
+        }
         case 'pencil':
-            state.isDrawing = true;
-            state.lastPos = pos;
             const newStroke = { id: Date.now(), points: [pos], color: el.colorPicker.value, lineWidth: el.lineWidth.value, timbre: state.activeTimbre };
             state.composition.strokes.push(newStroke);
             break;
         case 'eraser':
-            state.isDrawing = true;
             eraseAt(pos.x, pos.y);
             break;
         case 'hand':
-            state.isDrawing = true;
-            state.lastPos = pos;
             el.canvas.style.cursor = 'grabbing';
             break;
         case 'glissando':
@@ -276,21 +369,53 @@ function startAction(e) {
 }
 
 function stopAction(e) {
-    if (state.isDrawing) {
-        e.preventDefault();
-        state.isDrawing = false;
-        
-        if (state.activeTool === 'hand') {
-            el.canvas.style.cursor = 'grab';
-            return;
-        }
+    if (!state.isDrawing) return;
+    e.preventDefault();
 
-        ctx.beginPath();
-        const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
-        if (currentStroke && currentStroke.points.length > 200) {
-           currentStroke.points = simplify(currentStroke.points, 0.5, true);
-        }
+    if (state.isMoving) {
+        state.isMoving = false;
+        el.canvas.style.cursor = 'pointer';
         saveState();
+    }
+    
+    if (state.isSelecting) {
+        const r1 = {
+            x: state.selectionStart.x,
+            y: state.selectionStart.y,
+            width: state.selectionEnd.x - state.selectionStart.x,
+            height: state.selectionEnd.y - state.selectionStart.y,
+        };
+
+        const allElements = [...state.composition.strokes, ...state.composition.symbols];
+        allElements.forEach(element => {
+            const r2 = getElementBoundingBox(element);
+            if (doRectsIntersect(r1, r2)) {
+                if (!state.selectedElements.includes(element.id)) {
+                    state.selectedElements.push(element.id);
+                }
+            }
+        });
+        state.isSelecting = false;
+        redrawAll();
+    }
+    
+    state.isDrawing = false;
+    
+    if (state.activeTool === 'hand') {
+        setActiveTool('hand'); // To reset cursor to 'grab'
+        return;
+    }
+    if (['select', 'glissando'].includes(state.activeTool)) {
+        return;
+    }
+
+    ctx.beginPath();
+    const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
+    if (currentStroke && currentStroke.points.length > 200) {
+       currentStroke.points = simplify(currentStroke.points, 0.5, true);
+    }
+    if (state.activeTool !== 'eraser') {
+      saveState();
     }
 }
 
@@ -299,47 +424,85 @@ function performAction(e) {
     e.preventDefault();
     const pos = getEventPos(e);
 
-    if (state.activeTool === 'hand') {
+    if (state.isMoving) {
         const dx = pos.x - state.lastPos.x;
         const dy = pos.y - state.lastPos.y;
-        el.mainCanvasArea.scrollLeft -= dx;
-        el.mainCanvasArea.scrollTop -= dy;
+        moveSelectedElements(dx, dy);
         state.lastPos = pos;
+        redrawAll();
         return;
+    }
+
+    if (state.isSelecting) {
+        state.selectionEnd = pos;
+        redrawAll();
+        return;
+    }
+    
+    if (state.activeTool === 'hand') {
+        // Panning is better handled without zoom-adjusted coordinates
+        const rawPos = { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
+        const rawLastPos = { x: state.lastPos.rawX, y: state.lastPos.rawY };
+        if(rawLastPos.x){
+            const dx = rawPos.x - rawLastPos.x;
+            const dy = rawPos.y - rawLastPos.y;
+            el.mainCanvasArea.scrollLeft -= dx;
+            el.mainCanvasArea.scrollTop -= dy;
+        }
+        state.lastPos.rawX = rawPos.x;
+        state.lastPos.rawY = rawPos.y;
+        return;
+    } else {
+        state.lastPos.rawX = null;
+        state.lastPos.rawY = null;
     }
 
     if (state.activeTool === 'pencil') {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (!currentStroke) return;
         currentStroke.points.push(pos);
-        
-        ctx.beginPath();
-        ctx.moveTo(state.lastPos.x, state.lastPos.y);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = currentStroke.color;
-        ctx.lineWidth = currentStroke.lineWidth;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-        
+        redrawAll(); // Redraw for live preview with zoom
         state.lastPos = pos;
     } else if (state.activeTool === 'eraser') {
         eraseAt(pos.x, pos.y);
     }
 }
 
-function syncScroll(e) {
-    el.xRulerContainer.scrollLeft = e.target.scrollLeft;
-    el.yRulerContainer.scrollTop = e.target.scrollTop;
-}
+function handleZoom(zoomIn) {
+    const oldZoom = state.zoomLevel;
+    let newZoom = oldZoom + (zoomIn ? ZOOM_STEP : -ZOOM_STEP) * oldZoom;
+    newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
 
+    if (newZoom === oldZoom) return;
+
+    // Get the canvas point under the center of the viewport
+    const viewCenterX = el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth / 2;
+    const viewCenterY = el.mainCanvasArea.scrollTop + el.mainCanvasArea.offsetHeight / 2;
+
+    const pointX = viewCenterX / oldZoom;
+    const pointY = viewCenterY / oldZoom;
+    
+    state.zoomLevel = newZoom;
+    el.canvasContainer.style.transform = `scale(${newZoom})`;
+    el.canvasContainer.style.transformOrigin = '0 0';
+    
+    // Calculate new scroll position to keep the point centered
+    const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
+    const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
+
+    el.mainCanvasArea.scrollLeft = newScrollX;
+    el.mainCanvasArea.scrollTop = newScrollY;
+
+    redrawAll();
+}
 // --- DRAWING & COMPOSITION ---
 function handleClear() {
     if (confirm("Tem certeza de que deseja limpar toda a pauta? Esta ação não pode ser desfeita.")) {
         state.composition = { strokes: [], symbols: [] };
+        state.selectedElements = [];
         state.history = [];
         state.historyIndex = -1;
-        saveState(true); // Save the new empty state
+        saveState(true);
         redrawAll();
     }
 }
@@ -400,6 +563,181 @@ function eraseAt(x, y) {
     }
 }
 
+
+// --- SELECTION, COPY, PASTE, DELETE HELPERS ---
+function moveSelectedElements(dx, dy) {
+    state.selectedElements.forEach(id => {
+        const element = findElementById(id);
+        if (element) {
+            if (element.points) { // Stroke
+                element.points.forEach(p => {
+                    p.x += dx;
+                    p.y += dy;
+                });
+            } else { // Symbol
+                element.x += dx;
+                element.y += dy;
+                if (typeof element.endX !== 'undefined') {
+                    element.endX += dx;
+                    element.endY += dy;
+                }
+            }
+        }
+    });
+}
+
+function deleteSelectedElements() {
+    if (state.selectedElements.length === 0) return;
+    state.composition.strokes = state.composition.strokes.filter(s => !state.selectedElements.includes(s.id));
+    state.composition.symbols = state.composition.symbols.filter(s => !state.selectedElements.includes(s.id));
+    state.selectedElements = [];
+    saveState();
+    redrawAll();
+}
+
+function copySelectedElements() {
+    if (state.selectedElements.length === 0) return;
+    clipboard = state.selectedElements
+        .map(id => findElementById(id))
+        .filter(Boolean)
+        .map(el => JSON.parse(JSON.stringify(el)));
+}
+
+function pasteElements() {
+    if (clipboard.length === 0) return;
+    const newSelection = [];
+    const pasteOffset = 20;
+
+    clipboard.forEach(element => {
+        const newElement = JSON.parse(JSON.stringify(element));
+        newElement.id = Date.now() + Math.random();
+
+        if (newElement.points) {
+            newElement.points.forEach(p => {
+                p.x += pasteOffset;
+                p.y += pasteOffset;
+            });
+            state.composition.strokes.push(newElement);
+        } else {
+            newElement.x += pasteOffset;
+            newElement.y += pasteOffset;
+            if (newElement.endX) newElement.endX += pasteOffset;
+            if (newElement.endY) newElement.endY += pasteOffset;
+            state.composition.symbols.push(newElement);
+        }
+        newSelection.push(newElement.id);
+    });
+
+    state.selectedElements = newSelection;
+    saveState();
+    redrawAll();
+}
+
+function findElementById(id) {
+    return state.composition.strokes.find(s => s.id === id) || state.composition.symbols.find(s => s.id === id);
+}
+
+function getElementBoundingBox(element) {
+    if (!element) return null;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    if (element.points && element.points.length > 0) {
+        element.points.forEach(p => {
+            minX = Math.min(minX, p.x);
+            minY = Math.min(minY, p.y);
+            maxX = Math.max(maxX, p.x);
+            maxY = Math.max(maxY, p.y);
+        });
+    } else {
+        const size = element.size || 10;
+        if (element.type === 'glissando') {
+            minX = Math.min(element.x, element.endX);
+            minY = Math.min(element.y, element.endY);
+            maxX = Math.max(element.x, element.endX);
+            maxY = Math.max(element.y, element.endY);
+        } else {
+             minX = element.x - size / 2;
+             minY = element.y - size / 2;
+             maxX = element.x + size / 2;
+             maxY = element.y + size / 2;
+        }
+    }
+    return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+}
+
+function drawMarquee() {
+    if (!state.isSelecting || !state.selectionStart || !state.selectionEnd) return;
+    const start = state.selectionStart;
+    const end = state.selectionEnd;
+    const selectionColor = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
+
+    ctx.save();
+    ctx.fillStyle = selectionColor.replace(/[^,]+(?=\))/, '0.2');
+    ctx.strokeStyle = selectionColor;
+    ctx.lineWidth = 1;
+    ctx.fillRect(start.x, start.y, end.x - start.x, end.y - start.y);
+    ctx.strokeRect(start.x, start.y, end.x - start.x, end.y - start.y);
+    ctx.restore();
+}
+
+function drawSelectionIndicator(element) {
+    const box = getElementBoundingBox(element);
+    if (box) {
+        ctx.save();
+        ctx.strokeStyle = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(box.x - 5, box.y - 5, box.width + 10, box.height + 10);
+        ctx.restore();
+    }
+}
+
+function isPointNearLine(p, a, b, tolerance) {
+    const L2 = (b.x - a.x)**2 + (b.y - a.y)**2;
+    if (L2 === 0) return Math.sqrt((p.x - a.x)**2 + (p.y - a.y)**2) < tolerance;
+    let t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / L2;
+    t = Math.max(0, Math.min(1, t));
+    const dx = p.x - (a.x + t * (b.x - a.x));
+    const dy = p.y - (a.y + t * (b.y - a.y));
+    return (dx**2 + dy**2) < tolerance**2;
+}
+
+function getElementAtPos(pos) {
+    const tolerance = 10; 
+    for (let i = state.composition.symbols.length - 1; i >= 0; i--) {
+        const s = state.composition.symbols[i];
+        const box = getElementBoundingBox(s);
+        if (box && pos.x >= box.x - tolerance && pos.x <= box.x + box.width + tolerance && pos.y >= box.y - tolerance && pos.y <= box.y + box.height + tolerance) {
+            return s;
+        }
+    }
+    for (let i = state.composition.strokes.length - 1; i >= 0; i--) {
+        const stroke = state.composition.strokes[i];
+        const strokeTolerance = (stroke.lineWidth / 2) + tolerance;
+        for (let j = 0; j < stroke.points.length - 1; j++) {
+            if (isPointNearLine(pos, stroke.points[j], stroke.points[j+1], strokeTolerance)) {
+                return stroke;
+            }
+        }
+    }
+    return null;
+}
+
+function doRectsIntersect(r1, r2) {
+    if (!r1 || !r2) return false;
+    const selX1 = Math.min(r1.x, r1.x + r1.width);
+    const selX2 = Math.max(r1.x, r1.x + r1.width);
+    const selY1 = Math.min(r1.y, r1.y + r1.height);
+    const selY2 = Math.max(r1.y, r1.y + r1.height);
+
+    const elX1 = r2.x;
+    const elX2 = r2.x + r2.width;
+    const elY1 = r2.y;
+    const elY2 = r2.y + r2.height;
+    
+    return !(selX2 < elX1 || elX2 < selX1 || selY2 < elY1 || elY2 < selY1);
+}
+
 // --- PROJECT SAVE/LOAD/IMPORT ---
 function saveProject() {
     try {
@@ -424,11 +762,11 @@ function importProject(event) {
     reader.onload = (e) => {
         try {
             const projectData = JSON.parse(e.target.result);
-            // Basic validation
             if (projectData && Array.isArray(projectData.strokes) && Array.isArray(projectData.symbols)) {
                 state.composition = projectData;
+                state.selectedElements = [];
                 redrawAll();
-                saveState(); // Add imported state to history
+                saveState();
             } else {
                 throw new Error("Formato de arquivo inválido.");
             }
@@ -436,7 +774,6 @@ function importProject(event) {
             console.error("Erro ao importar projeto:", err);
             alert("Erro ao ler o arquivo do projeto. Ele pode estar corrompido ou não ser um arquivo .musdr válido.");
         } finally {
-            // Reset input to allow importing the same file again
             event.target.value = null;
         }
     };
@@ -465,11 +802,11 @@ function saveState(isInitial = false) {
     if (!isInitial) {
         state.history.length = state.historyIndex + 1;
     }
-    state.history.push(JSON.parse(JSON.stringify(state.composition)));
+    const historyState = { ...state.composition };
+    state.history.push(JSON.parse(JSON.stringify(historyState)));
     state.historyIndex++;
     updateUndoRedoButtons();
     updateExportButtonsState();
-    // Auto-save to localStorage
     localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition));
 }
 
@@ -477,7 +814,8 @@ function undo() {
     if (state.historyIndex > 0) {
         state.historyIndex--;
         state.composition = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
-        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition)); // Update autosave on undo
+        state.selectedElements = [];
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition));
         redrawAll();
         updateUndoRedoButtons();
         updateExportButtonsState();
@@ -488,7 +826,8 @@ function redo() {
     if (state.historyIndex < state.history.length - 1) {
         state.historyIndex++;
         state.composition = JSON.parse(JSON.stringify(state.history[state.historyIndex]));
-        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition)); // Update autosave on redo
+        state.selectedElements = [];
+        localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(state.composition));
         redrawAll();
         updateUndoRedoButtons();
         updateExportButtonsState();
@@ -565,8 +904,7 @@ function animatePlayhead() {
         
         el.playhead.style.transform = `translateX(${currentX}px)`;
         
-        // Auto-scroll
-        const playheadRightEdge = currentX + 100; // Look ahead
+        const playheadRightEdge = currentX + 100;
         if(playheadRightEdge > el.mainCanvasArea.scrollLeft + el.mainCanvasArea.clientWidth) {
             el.mainCanvasArea.scrollLeft = Math.min(maxScroll, playheadRightEdge - el.mainCanvasArea.clientWidth);
         }
@@ -802,11 +1140,14 @@ function setActiveTool(toolName) {
     state.glissandoStart = null;
     Object.values(el.tools).forEach(btn => btn?.classList.remove('active'));
     el.tools[toolName]?.classList.add('active');
+    
     let cursor = 'crosshair';
-    if (['staccato', 'percussion', 'arpeggio', 'granular', 'tremolo', 'filter', 'delay'].includes(toolName)) cursor = 'copy';
-    if (toolName === 'glissando') cursor = 'pointer';
-    if (toolName === 'hand') cursor = 'grab';
-    if (toolName === 'eraser') cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="2,2"/></svg>') 12 12, auto`;
+    if (toolName === 'select') cursor = 'pointer';
+    else if (toolName === 'hand') cursor = 'grab';
+    else if (toolName === 'eraser') cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="2,2"/></svg>') 12 12, auto`;
+    else if (toolName === 'glissando') cursor = 'pointer';
+    else if (['staccato', 'percussion', 'arpeggio', 'granular', 'tremolo', 'filter', 'delay'].includes(toolName)) cursor = 'copy';
+    
     el.canvas.style.cursor = cursor;
 }
 
@@ -842,13 +1183,11 @@ d.addEventListener('DOMContentLoaded', () => {
     }
      const backgroundAudio = d.getElementById('background-audio');
      if (backgroundAudio) {
-        // Tenta tocar o áudio. Pode ser bloqueado pelas políticas de autoplay do navegador.
         backgroundAudio.play().catch(error => {
             console.log("A reprodução automática foi bloqueada. O áudio começará no primeiro clique do usuário.", error);
-            // Se for bloqueado, adiciona um ouvinte para o primeiro clique em qualquer lugar da tela
             d.body.addEventListener('click', () => {
                 backgroundAudio.play();
-            }, { once: true }); // 'once: true' garante que isso aconteça apenas uma vez
+            }, { once: true });
         });
     }
     const selectionContainer = d.getElementById('selection-container');

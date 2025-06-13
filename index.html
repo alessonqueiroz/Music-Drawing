@@ -39,7 +39,7 @@
         <div class="app-container w-full h-full flex flex-col rounded-2xl overflow-hidden">
          <header class="p-0 md:p-4 border-b flex justify-between items-center flex-shrink-0 flex-wrap gap-2">
     <div class="flex items-center gap-1">
-        <img src="logotipo roxo.png" alt="Logo do Music Drawing" class="w-16 h-16"> 
+        <img src="logo roxa.png" alt="Logo do Music Drawing" class="w-16 h-16"> 
         
         <div>
             <h1 class="text-xl md:text-2xl font-bold title-accent">Music Drawing <span class="text-base font-normal align-middle subtitle-color"></span></h1>
@@ -52,6 +52,8 @@
         <button id="importProjectBtn" class="tool-btn" title="Importar Projeto (.musdr)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> <span class="hidden md:inline">Importar</span></button>
         <button id="undoBtn" class="tool-btn" title="Desfazer (Ctrl+Z)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 13v-2.2A4.8 4.8 0 0 0 16.2 6H5M4 8l-3 3 3 3"/></svg></button>
         <button id="redoBtn" class="tool-btn" title="Refazer (Ctrl+Y)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13v-2.2A4.8 4.8 0 0 1 7.8 6H19M20 8l3 3-3 3"/></svg></button>
+        <button id="zoomOutBtn" class="tool-btn" title="Diminuir Zoom (Ctrl -)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
+        <button id="zoomInBtn" class="tool-btn" title="Aumentar Zoom (Ctrl +)"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line><line x1="11" y1="8" x2="11" y2="14"></line><line x1="8" y1="11" x2="14" y2="11"></line></svg></button>
         <div class="dropdown">
             <button id="exportBtn" class="tool-btn primary" title="Exportar Mídia"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> <span class="hidden md:inline">Exportar</span></button>
             <div class="dropdown-content">
@@ -84,6 +86,7 @@
                         <div class="sidebar-section toolbar-panel active" data-panel="tools">
                             <h2 class="sidebar-title">Ferramentas</h2>
                             <div class="grid grid-cols-3 gap-2">
+                                <button id="select" class="tool-btn flex-col" title="Seletor"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"/><path d="M13 13l6 6"/></svg><span class="text-xs mt-1">Seletor</span></button>
                                 <button id="pencil" class="tool-btn flex-col" title="Lápis"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg><span class="text-xs mt-1">Lápis</span></button>
                                 <button id="eraser" class="tool-btn flex-col" title="Borracha"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21H7Z"/><path d="M22 21H7m-5-9l5 5"/></svg><span class="text-xs mt-1">Borracha</span></button>
                                 <button id="hand" class="tool-btn flex-col" title="Mover"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 18v3.9c0 .6.6 1.1 1.2 1.1h5.5c.7 0 1.3-.5 1.3-1.1V18M8 18h9a2 2 0 0 0 2-2v-5c0-1.1-.9-2-2-2h-1.4c-.5 0-1-.2-1.3-.5L13 6.1c-.3-.4-.9-.6-1.4-.6h-1.4c-.5 0-1 .2-1.3.5l-2.6 3.4c-.3.4-.9-.6-1.4.6H4c-1.1 0-2 .9-2 2v5c0 1.1.9 2 2 2h4Z"></path></svg><span class="text-xs mt-1">Mover</span></button>

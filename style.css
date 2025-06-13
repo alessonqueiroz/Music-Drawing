@@ -5,6 +5,7 @@
     --primary-glow: #a972ff;
     --secondary-glow: #639fff;
     --danger-glow: #ff72a1;
+    --selection-glow: rgba(0, 180, 255, 0.9);
     --bg-dark: #050210;
     --bg-dark-glass: rgba(10, 5, 30, 0.3);
     --bg-dark-sidebar: rgba(10, 5, 30, 0.1);
@@ -21,6 +22,7 @@
     --primary-glow: #6d28d9;
     --secondary-glow: #2563eb;
     --danger-glow: #e11d48;
+    --selection-glow: rgba(0, 120, 220, 0.9);
     --bg-dark: #f9fafb;
     --bg-dark-glass: rgba(255, 255, 255, 0.3);
     --bg-dark-sidebar: rgba(245, 245, 245, 0.8);
