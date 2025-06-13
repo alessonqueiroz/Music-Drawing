@@ -204,8 +204,8 @@ body.mobile-mode .timbre-btn { padding: 12px 8px; font-size: 0.8rem; }
 body.mobile-mode .danger-btn { margin-top: 8px; flex-shrink: 0; }
 
 /* Mobile Canvas/Ruler dimensions */
-body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 20px; grid-template-columns: 35px 1fr; }
-body.mobile-mode #y-ruler-container { width: 35px; }
-body.mobile-mode #x-ruler-container { height: 20px; }
+body.mobile-mode #canvas-wrapper { grid-template-rows: 1fr 25px; grid-template-columns: 40px 1fr; }
+body.mobile-mode #y-ruler-container { width: 40px; }
+body.mobile-mode #x-ruler-container { height: 25px; }
 body.mobile-mode .play-btn { padding: 8px 12px; }
 body.mobile-mode #playBtnText { font-size: 0.9rem;}

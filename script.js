@@ -220,6 +220,25 @@ function drawRulers() {
     }
 }
 
+function setupMobileToolbar() {
+    const tabs = d.querySelectorAll('#mobile-toolbar-tabs .toolbar-tab');
+    const panels = d.querySelectorAll('#panels-container .toolbar-panel');
+
+    tabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetPanelId = tab.getAttribute('data-tab');
+
+            // Remove a classe 'active' de todas as abas e painéis
+            tabs.forEach(t => t.classList.remove('active'));
+            panels.forEach(p => p.classList.remove('active'));
+
+            // Adiciona a classe 'active' à aba clicada e ao painel correspondente
+            tab.classList.add('active');
+            d.querySelector(`.toolbar-panel[data-panel="${targetPanelId}"]`).classList.add('active');
+        });
+    });
+}
+
 // --- EVENT HANDLING ---
 function setupEventListeners() {
     window.addEventListener('resize', resizeAndRedraw);
