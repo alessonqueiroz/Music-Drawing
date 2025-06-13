@@ -142,7 +142,7 @@ input[type="color"]::-webkit-color-swatch { border-radius: 7px; border: none; }
 #x-ruler-container { grid-area: x-ruler; height: 30px; overflow: hidden; }
 #canvas-container { position: relative; }
 #drawingCanvas, #y-ruler-canvas, #x-ruler-canvas { display: block; background-color: var(--bg-dark); }
-#y-ruler-canvas, #x-ruler-canvas { height: 100%; width: 100%; }
+#y-ruler-canvas, #x-ruler-canvas { height: 100%; }
 #playhead { width: 2px; height: 100%; background-color: var(--primary-glow); box-shadow: 0 0 10px var(--primary-glow); position: absolute; top: 0; left: 0; transform: translateX(0); z-index: 5; pointer-events: none; }
 #loading-overlay .loader { width: 60px; height: 60px; border: 5px solid rgba(255, 255, 255, 0.2); border-top-color: var(--primary-glow); border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
