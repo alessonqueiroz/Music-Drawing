@@ -62,9 +62,14 @@ let state = {
 };
 
 // --- CORE FUNCTIONS ---
+
 function initApp(mode = 'pc') {
+        const backgroundAudio = d.getElementById('background-audio');
+    if (backgroundAudio && !backgroundAudio.paused) {
+        backgroundAudio.pause();
+        backgroundAudio.currentTime = 0; }
     d.getElementById('selection-container')?.classList.add('hidden');
-    d.getElementById('app-wrapper')?.classList.remove('hidden');
+     d.getElementById('app-wrapper')?.classList.remove('hidden');
     
     if (mode === 'mobile') {
         d.body.classList.add('mobile-mode');
@@ -835,7 +840,17 @@ d.addEventListener('DOMContentLoaded', () => {
         pcModeBtn.addEventListener('click', () => initApp('pc'));
         mobileModeBtn.addEventListener('click', () => initApp('mobile'));
     }
-
+     const backgroundAudio = d.getElementById('background-audio');
+     if (backgroundAudio) {
+        // Tenta tocar o áudio. Pode ser bloqueado pelas políticas de autoplay do navegador.
+        backgroundAudio.play().catch(error => {
+            console.log("A reprodução automática foi bloqueada. O áudio começará no primeiro clique do usuário.", error);
+            // Se for bloqueado, adiciona um ouvinte para o primeiro clique em qualquer lugar da tela
+            d.body.addEventListener('click', () => {
+                backgroundAudio.play();
+            }, { once: true }); // 'once: true' garante que isso aconteça apenas uma vez
+        });
+    }
     const selectionContainer = d.getElementById('selection-container');
     const appWrapper = d.getElementById('app-wrapper');
     if(selectionContainer) selectionContainer.classList.remove('hidden');
