@@ -29,7 +29,7 @@ const el = {
     importProjectBtn: d.getElementById('importProjectBtn'),
     musdrImporter: d.getElementById('musdrImporter'),
 
-    exportBtn: d.getElementById('exportBtn'), 
+    exportBtn: d.getElementById('exportBtn'), // Referência ao botão principal
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
     zoomInBtn: d.getElementById('zoomInBtn'), 
@@ -137,8 +137,7 @@ function resizeAndRedraw() {
 }
 
 function redrawAll() {
-    // CORREÇÃO: Limpa o canvas inteiro, independentemente do zoom.
-    ctx.clearRect(0, 0, el.canvas.width, el.canvas.height);
+    ctx.clearRect(0, 0, el.canvas.width / state.zoomLevel, el.canvas.height / state.zoomLevel);
     
     ctx.save();
     ctx.scale(state.zoomLevel, state.zoomLevel);
@@ -181,6 +180,7 @@ function drawRulers() {
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
     const rulerFont = '9px Inter';
 
+    // X-Ruler (Time)
     xRulerCtx.fillStyle = textColor;
     xRulerCtx.font = rulerFont;
     xRulerCtx.textAlign = 'center';
@@ -207,6 +207,7 @@ function drawRulers() {
         }
     }
 
+    // --- Y-Ruler (Frequency) ---
     yRulerCtx.fillStyle = textColor;
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
@@ -371,21 +372,16 @@ function setupEventListeners() {
     });
 }
 
-// CORREÇÃO: Função de cálculo de posição do evento
 function getEventPos(e) {
-    const rect = el.canvas.getBoundingClientRect();
+    const rect = el.mainCanvasArea.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-
-    const xOnScaledElement = clientX - rect.left;
-    const yOnScaledElement = clientY - rect.top;
-
-    const x = xOnScaledElement / state.zoomLevel;
-    const y = yOnScaledElement / state.zoomLevel;
-
+    
+    const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
+    
     return { x, y };
 }
-
 
 function startAction(e) {
     if (e.target === el.playhead) return;
@@ -491,15 +487,11 @@ function stopAction(e) {
         return;
     }
 
-    redrawAll();
-
+    ctx.beginPath();
     const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
-    if (currentStroke && currentStroke.points.length > 1) { 
-        if (currentStroke.points.length > 200) {
-            currentStroke.points = simplify(currentStroke.points, 0.5, true);
-        }
+    if (currentStroke && currentStroke.points.length > 200) {
+       currentStroke.points = simplify(currentStroke.points, 0.5, true);
     }
-    
     if (state.activeTool !== 'eraser') {
       saveState();
     }
@@ -546,24 +538,11 @@ function performAction(e) {
     if (state.activeTool === 'pencil') {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (!currentStroke) return;
-        
-        ctx.save();
-        ctx.scale(state.zoomLevel, state.zoomLevel);
-        ctx.beginPath();
-        ctx.moveTo(state.lastPos.x, state.lastPos.y);
-        ctx.lineTo(pos.x, pos.y);
-        ctx.strokeStyle = el.colorPicker.value;
-        ctx.lineWidth = el.lineWidth.value;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.stroke();
-        ctx.restore();
-
         currentStroke.points.push(pos);
-        
+        redrawAll(); 
         state.lastPos = pos;
     } else if (state.activeTool === 'eraser') {
-        eraseAt(pos.x, pos.y); 
+        eraseAt(pos.x, pos.y);
     }
 }
 
@@ -581,6 +560,8 @@ function handleZoom(zoomIn) {
     const pointY = viewCenterY / oldZoom;
     
     state.zoomLevel = newZoom;
+    el.canvasContainer.style.transform = `scale(${newZoom})`;
+    el.canvasContainer.style.transformOrigin = '0 0';
     
     const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
     const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
@@ -645,7 +626,7 @@ function stopPlayheadDrag() {
     if (state.isDraggingPlayhead) {
         state.isDraggingPlayhead = false;
         d.body.style.cursor = 'default';
-        setActiveTool(state.activeTool);
+        setActiveTool(state.activeTool); // Restaura o cursor da ferramenta
     }
 }
 
@@ -684,7 +665,6 @@ function placeSymbol(pos) {
 
 function drawSymbol(s) {
     ctx.save();
-    ctx.scale(state.zoomLevel, state.zoomLevel);
     ctx.fillStyle = s.color;
     ctx.strokeStyle = s.color;
     const size = s.size;
@@ -834,7 +814,6 @@ function drawMarquee() {
     const selectionColor = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
 
     ctx.save();
-    ctx.scale(state.zoomLevel, state.zoomLevel);
     ctx.fillStyle = selectionColor.replace(/[^,]+(?=\))/, '0.2');
     ctx.strokeStyle = selectionColor;
     ctx.lineWidth = 1;
@@ -847,7 +826,6 @@ function drawSelectionIndicator(element) {
     const box = getElementBoundingBox(element);
     if (box) {
         ctx.save();
-        ctx.scale(state.zoomLevel, state.zoomLevel);
         ctx.strokeStyle = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
         ctx.lineWidth = 1.5;
         ctx.setLineDash([5, 5]);
