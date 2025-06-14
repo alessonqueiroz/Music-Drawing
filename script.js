@@ -29,7 +29,7 @@ const el = {
     importProjectBtn: d.getElementById('importProjectBtn'),
     musdrImporter: d.getElementById('musdrImporter'),
 
-    exportBtn: d.getElementById('exportBtn'), // Referência ao botão principal
+    exportBtn: d.getElementById('exportBtn'), 
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
     zoomInBtn: d.getElementById('zoomInBtn'), 
@@ -83,6 +83,7 @@ let state = {
     isDraggingEnd: false,
     isDraggingPlayhead: false,
 };
+let baseCanvasHeight = 0;
 let clipboard = [];
 
 // --- CORE FUNCTIONS ---
@@ -115,33 +116,27 @@ function initApp(mode = 'pc') {
 
 function resizeAndRedraw() {
     const canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
-    const canvasHeight = el.mainCanvasArea.offsetHeight;
     
-    if(canvasHeight <= 0) {
-        setTimeout(resizeAndRedraw, 100);
-        return;
+    if (!baseCanvasHeight) {
+        baseCanvasHeight = el.mainCanvasArea.offsetHeight;
     }
-    
-    el.canvas.width = canvasWidth;
-    el.canvas.height = canvasHeight;
-    el.canvasContainer.style.width = `${canvasWidth}px`;
-    el.canvasContainer.style.height = `${canvasHeight}px`;
 
-    el.yRulerCanvas.width = el.yRulerContainer.offsetWidth;
-    el.yRulerCanvas.height = canvasHeight;
-    
+    el.canvas.width = canvasWidth;
+    el.canvas.height = baseCanvasHeight; 
+
     el.xRulerCanvas.width = canvasWidth;
     el.xRulerCanvas.height = el.xRulerContainer.offsetHeight;
+    el.yRulerCanvas.width = el.yRulerContainer.offsetWidth;
+    el.yRulerCanvas.height = baseCanvasHeight;
 
-    redrawAll();
+    handleZoom(false, true);
 }
 
 function redrawAll() {
-    ctx.clearRect(0, 0, el.canvas.width / state.zoomLevel, el.canvas.height / state.zoomLevel);
+    ctx.clearRect(0, 0, el.canvas.width, el.canvas.height);
     
     ctx.save();
-    ctx.scale(state.zoomLevel, state.zoomLevel);
-
+    
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
         ctx.beginPath();
@@ -179,6 +174,8 @@ function drawRulers() {
 
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
     const rulerFont = '9px Inter';
+    const xZoom = state.zoomLevel;
+    const yZoom = state.zoomLevel;
 
     // X-Ruler (Time)
     xRulerCtx.fillStyle = textColor;
@@ -186,13 +183,11 @@ function drawRulers() {
     xRulerCtx.textAlign = 'center';
     xRulerCtx.textBaseline = 'top';
 
-    const xScroll = el.mainCanvasArea.scrollLeft;
-    const xZoom = state.zoomLevel;
-    const startSec = Math.floor(xScroll / (PIXELS_PER_SECOND * xZoom));
-    const endSec = Math.ceil((xScroll + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
+    const startSec = Math.floor(el.mainCanvasArea.scrollLeft / (PIXELS_PER_SECOND * xZoom));
+    const endSec = Math.ceil((el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
     
     for (let sec = startSec; sec <= endSec; sec++) {
-        const xPos = (sec * PIXELS_PER_SECOND * xZoom) - xScroll;
+        const xPos = sec * PIXELS_PER_SECOND * xZoom - el.mainCanvasArea.scrollLeft;
         
         let isMajorTick = false;
         if (xZoom > 2) isMajorTick = (sec % 1 === 0);
@@ -207,45 +202,32 @@ function drawRulers() {
         }
     }
 
-    // --- Y-Ruler (Frequency) ---
+    // Y-Ruler (Frequency)
     yRulerCtx.fillStyle = textColor;
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
     yRulerCtx.textBaseline = 'middle';
 
     const yScroll = el.mainCanvasArea.scrollTop;
-    const yZoom = state.zoomLevel;
 
     let minorStep, majorStep;
-    if (yZoom < 0.75) {
-        minorStep = 200;
-        majorStep = 400;
-    } else if (yZoom < 1.5) {
-        minorStep = 100;
-        majorStep = 200;
-    } else if (yZoom < 3.0) {
-        minorStep = 50;
-        majorStep = 100;
-    } else { 
-        minorStep = 20;
-        majorStep = 100;
-    }
+    if (yZoom < 0.75) { minorStep = 200; majorStep = 400;
+    } else if (yZoom < 1.5) { minorStep = 100; majorStep = 200;
+    } else if (yZoom < 3.0) { minorStep = 50; majorStep = 100;
+    } else { minorStep = 20; majorStep = 100; }
 
     const drawnLabels = []; 
     const loopIncrement = minorStep / 2;
 
     for (let freq = FREQ_MIN; freq <= FREQ_MAX; freq += loopIncrement) {
-        
         let isMajor = freq % majorStep === 0;
         let isMinor = freq % minorStep === 0;
 
         if (!isMajor && !isMinor) continue;
 
-        const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
-
-        if (yPos < -10 || yPos > el.yRulerCanvas.height + 10) continue;
+        const yPos = yFromFrequency(freq) * yZoom - yScroll;
+        if (yPos < -10 || yPos > el.mainCanvasArea.offsetHeight + 10) continue;
         
-
         if (isMajor) {
             let collision = false;
             for (const drawnY of drawnLabels) {
@@ -314,6 +296,19 @@ function setupEventListeners() {
     el.importProjectBtn.addEventListener('click', () => el.musdrImporter.click());
     el.musdrImporter.addEventListener('change', importProject);
 
+    el.exportBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const dropdownContainer = el.exportBtn.closest('.dropdown');
+        if (!dropdownContainer) return;
+        
+        const dropdownContent = dropdownContainer.querySelector('.dropdown-content');
+        if (!dropdownContent) return;
+
+        const isVisible = dropdownContent.style.display === 'block';
+        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+        dropdownContent.style.display = isVisible ? 'none' : 'block';
+    });
+
     el.exportJpgBtn.addEventListener('click', exportJpg);
     el.exportPdfBtn.addEventListener('click', exportPdf);
     el.exportWavBtn.addEventListener('click', exportWav);
@@ -336,6 +331,12 @@ function setupEventListeners() {
     window.addEventListener('touchmove', handlePlayheadDrag, { passive: false });
     window.addEventListener('touchend', stopPlayheadDrag);
     
+    window.addEventListener('click', (e) => {
+        if (!e.target.closest('.dropdown')) {
+            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
+        }
+    });
+
     window.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -372,16 +373,18 @@ function setupEventListeners() {
     });
 }
 
+
 function getEventPos(e) {
     const rect = el.mainCanvasArea.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
+
     const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
     const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
-    
+
     return { x, y };
 }
+
 
 function startAction(e) {
     if (e.target === el.playhead) return;
@@ -487,11 +490,15 @@ function stopAction(e) {
         return;
     }
 
-    ctx.beginPath();
+    redrawAll();
+
     const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
-    if (currentStroke && currentStroke.points.length > 200) {
-       currentStroke.points = simplify(currentStroke.points, 0.5, true);
+    if (currentStroke && currentStroke.points.length > 1) { 
+        if (currentStroke.points.length > 200) {
+            currentStroke.points = simplify(currentStroke.points, 0.5, true);
+        }
     }
+    
     if (state.activeTool !== 'eraser') {
       saveState();
     }
@@ -538,39 +545,51 @@ function performAction(e) {
     if (state.activeTool === 'pencil') {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (!currentStroke) return;
+        
+        ctx.save();
+        ctx.scale(state.zoomLevel, state.zoomLevel);
+        ctx.beginPath();
+        ctx.moveTo(state.lastPos.x, state.lastPos.y);
+        ctx.lineTo(pos.x, pos.y);
+        ctx.strokeStyle = el.colorPicker.value;
+        ctx.lineWidth = el.lineWidth.value;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+        ctx.restore();
+
         currentStroke.points.push(pos);
-        redrawAll(); 
+        
         state.lastPos = pos;
     } else if (state.activeTool === 'eraser') {
-        eraseAt(pos.x, pos.y);
+        eraseAt(pos.x, pos.y); 
     }
 }
 
-function handleZoom(zoomIn) {
-    const oldZoom = state.zoomLevel;
-    let newZoom = oldZoom + (zoomIn ? ZOOM_STEP : -ZOOM_STEP) * oldZoom;
-    newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+function handleZoom(zoomIn, isForced = false) {
+    let newZoom = state.zoomLevel;
+    if (!isForced) {
+        const oldZoom = state.zoomLevel;
+        newZoom = oldZoom + (zoomIn ? ZOOM_STEP : -ZOOM_STEP) * oldZoom;
+        newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
 
-    if (newZoom === oldZoom) return;
-
-    const viewCenterX = el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth / 2;
-    const viewCenterY = el.mainCanvasArea.scrollTop + el.mainCanvasArea.offsetHeight / 2;
-
-    const pointX = viewCenterX / oldZoom;
-    const pointY = viewCenterY / oldZoom;
+        if (newZoom === oldZoom) return;
+    }
     
     state.zoomLevel = newZoom;
-    el.canvasContainer.style.transform = `scale(${newZoom})`;
-    el.canvasContainer.style.transformOrigin = '0 0';
     
-    const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
-    const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
+    const newCanvasWidth = el.canvas.width * state.zoomLevel;
+    const newCanvasHeight = el.canvas.height * state.zoomLevel;
+    
+    el.canvasContainer.style.width = `${newCanvasWidth}px`;
+    el.canvasContainer.style.height = `${newCanvasHeight}px`;
 
-    el.mainCanvasArea.scrollLeft = newScrollX;
-    el.mainCanvasArea.scrollTop = newScrollY;
-
+    el.yRulerContainer.style.height = `${newCanvasHeight}px`;
+    el.yRulerCanvas.height = newCanvasHeight;
+    
     redrawAll();
 }
+
 
 function handleTimelineClick(e) {
     if (state.isPlaying) {
@@ -580,9 +599,9 @@ function handleTimelineClick(e) {
     const rect = el.xRulerCanvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
 
-    const canvasX = (clickX + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    const canvasX = (clickX + el.mainCanvasArea.scrollLeft);
     
-    let newStartTime = canvasX / PIXELS_PER_SECOND;
+    let newStartTime = canvasX / (PIXELS_PER_SECOND * state.zoomLevel);
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
     state.playbackStartTime = newStartTime;
@@ -613,9 +632,9 @@ function handlePlayheadDrag(e) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const xPosOnCanvasArea = clientX - rect.left;
 
-    const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft);
     
-    let newStartTime = canvasX / PIXELS_PER_SECOND;
+    let newStartTime = canvasX / (PIXELS_PER_SECOND * state.zoomLevel);
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
     state.playbackStartTime = newStartTime;
@@ -626,12 +645,12 @@ function stopPlayheadDrag() {
     if (state.isDraggingPlayhead) {
         state.isDraggingPlayhead = false;
         d.body.style.cursor = 'default';
-        setActiveTool(state.activeTool); // Restaura o cursor da ferramenta
+        setActiveTool(state.activeTool);
     }
 }
 
 function updatePlayheadPosition() {
-    const playheadX = state.playbackStartTime * PIXELS_PER_SECOND;
+    const playheadX = state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel;
     el.playhead.style.transform = `translateX(${playheadX}px)`;
     el.playhead.classList.remove('hidden');
 }
@@ -1349,7 +1368,7 @@ function handleExportDrag(e) {
     const rect = el.xRulerContainer.getBoundingClientRect();
     const xPosOnRuler = e.clientX - rect.left;
     
-    const time = ((el.mainCanvasArea.scrollLeft / state.zoomLevel) + (xPosOnRuler / state.zoomLevel)) / PIXELS_PER_SECOND;
+    const time = (xPosOnRuler + el.mainCanvasArea.scrollLeft) / (PIXELS_PER_SECOND * state.zoomLevel);
     
     if (state.isDraggingStart) {
         state.exportStartTime = Math.max(0, Math.min(time, state.exportEndTime - 0.1)); 
@@ -1370,8 +1389,8 @@ function updateExportSelectionVisuals() {
     el.exportStartHandle.style.left = `${startHandlePos}px`;
     el.exportEndHandle.style.left = `${endHandlePos}px`;
 
-    const overlayStart = state.exportStartTime * PIXELS_PER_SECOND;
-    const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND;
+    const overlayStart = state.exportStartTime * PIXELS_PER_SECOND * zoom - scroll;
+    const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND * zoom - scroll;
     
     el.exportSelectionOverlay.style.left = `${overlayStart}px`;
     el.exportSelectionOverlay.style.width = `${overlayEnd - overlayStart}px`;
