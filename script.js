@@ -27,7 +27,7 @@ const el = {
 
     saveProjectBtn: d.getElementById('saveProjectBtn'),
     importProjectBtn: d.getElementById('importProjectBtn'),
-    musdrImporter: d.getElementById('musdrImporter'),
+    drawmusImporter: d.getElementById('drawmusImporter'),
 
     exportBtn: d.getElementById('exportBtn'), // Referência ao botão principal
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
@@ -312,8 +312,8 @@ function setupEventListeners() {
     el.zoomOutBtn.addEventListener('click', () => handleZoom(false));
 
     el.saveProjectBtn.addEventListener('click', saveProject);
-    el.importProjectBtn.addEventListener('click', () => el.musdrImporter.click());
-    el.musdrImporter.addEventListener('change', importProject);
+    el.importProjectBtn.addEventListener('click', () => el.drawmusImporter.click());
+    el.drawmusImporter.addEventListener('change', importProject);
 
     el.exportJpgBtn.addEventListener('click', exportJpg);
     el.exportPdfBtn.addEventListener('click', exportPdf);
@@ -898,7 +898,7 @@ function saveProject() {
         const blob = new Blob([projectData], { type: 'application/json' });
         const link = d.createElement('a');
         link.href = URL.createObjectURL(blob);
-        link.download = `meu-projeto-${Date.now()}.musdr`;
+        link.download = `meu-projeto-${Date.now()}.drawmus`;
         link.click();
         URL.revokeObjectURL(link.href);
     } catch (e) {
@@ -925,7 +925,7 @@ function importProject(event) {
             }
         } catch (err) {
             console.error("Erro ao importar projeto:", err);
-            alert("Erro ao ler o arquivo do projeto. Ele pode estar corrompido ou não ser um arquivo .musdr válido.");
+            alert("Erro ao ler o arquivo do projeto. Ele pode estar corrompido ou não ser um arquivo .drawmus válido.");
         } finally {
             event.target.value = null;
         }

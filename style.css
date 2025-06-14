@@ -238,8 +238,8 @@ body.mobile-mode .toolbar-panel.active { display: block; }
 /* Hide/show elements for mobile */
 body.mobile-mode .sidebar-title { display: none; }
 body.mobile-mode .sidebar-section { padding: 4px; background-color: transparent; }
-body.mobile-mode header h1 { font-size: 1rem; flex-shrink: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-body.mobile-mode header p, body.mobile-mode #exportBtn span, body.mobile-mode #saveProjectBtn span, body.mobile-mode #importProjectBtn span { display: none; }
+/* Rules for header h1 and p were removed from here to fix formatting */
+body.mobile-mode #exportBtn span, body.mobile-mode #saveProjectBtn span, body.mobile-mode #importProjectBtn span { display: none; }
 body.mobile-mode .dropdown-content { position: fixed; bottom: 0; left: 0; width: 100%; border-radius: 12px 12px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.2); }
 
 /* Restructure mobile controls */
@@ -263,3 +263,14 @@ body.mobile-mode #y-ruler-container { width: 40px; }
 body.mobile-mode #x-ruler-container { height: 25px; }
 body.mobile-mode .play-btn { padding: 8px 12px; }
 body.mobile-mode #playBtnText { font-size: 0.9rem;}
+
+/* ==========================================================================
+   7. Correção para Rolagem em Modo Paisagem (Mobile)
+   ========================================================================== */
+@media screen and (orientation: landscape) and (max-height: 600px) {
+    body.mobile-mode {
+        /* Ativa a rolagem para o corpo da página quando em modo paisagem mobile,
+           permitindo que o usuário veja todo o conteúdo que não cabe na tela. */
+        overflow: auto;
+    }
+}
