@@ -15,16 +15,16 @@ const ZOOM_STEP = 0.1;
 // --- DOM ELEMENTS ---
 const el = {
     playBtn: d.getElementById('playBtn'), playIcon: d.getElementById('playIcon'), pauseIcon: d.getElementById('pauseIcon'), playBtnText: d.querySelector('#playBtn span'),
-    resetViewBtn: d.getElementById('resetViewBtn'), 
+    resetViewBtn: d.getElementById('resetViewBtn'),
     playhead: d.getElementById('playhead'), colorPicker: d.getElementById('colorPicker'), lineWidth: d.getElementById('lineWidth'),
-    clearBtn: d.getElementById('clearBtn'), 
-    reverbSlider: d.getElementById('reverb'), 
+    clearBtn: d.getElementById('clearBtn'),
+    reverbSlider: d.getElementById('reverb'),
     delayTimeSlider: d.getElementById('delayTime'),
     delayFeedbackSlider: d.getElementById('delayFeedback'),
     themeToggle: d.getElementById('theme-toggle'),
     themeSun: d.getElementById('theme-icon-sun'), themeMoon: d.getElementById('theme-icon-moon'),
     loadingOverlay: d.getElementById('loading-overlay'),
-    
+
     saveProjectBtn: d.getElementById('saveProjectBtn'),
     importProjectBtn: d.getElementById('importProjectBtn'),
     musdrImporter: d.getElementById('musdrImporter'),
@@ -32,9 +32,9 @@ const el = {
     exportBtn: d.getElementById('exportBtn'), // Referência ao botão principal
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
-    zoomInBtn: d.getElementById('zoomInBtn'), 
-    zoomOutBtn: d.getElementById('zoomOutBtn'), 
-    
+    zoomInBtn: d.getElementById('zoomInBtn'),
+    zoomOutBtn: d.getElementById('zoomOutBtn'),
+
     canvas: d.getElementById('drawingCanvas'),
     canvasContainer: d.getElementById('canvas-container'),
     mainCanvasArea: d.getElementById('main-canvas-area'),
@@ -58,16 +58,16 @@ const xRulerCtx = el.xRulerCanvas.getContext('2d');
 // --- STATE MANAGEMENT ---
 let state = {
     isDrawing: false,
-    isSelecting: false, 
+    isSelecting: false,
     isMoving: false,
     selectionStart: null,
-    selectionEnd: null,  
+    selectionEnd: null,
     activeTool: 'pencil',
     activeTimbre: 'sine',
     lastPos: { x: 0, y: 0 },
     glissandoStart: null,
     isPlaying: false,
-    playbackStartTime: 0, 
+    playbackStartTime: 0,
     animationFrameId: null,
     audioCtx: null,
     sourceNodes: [],
@@ -78,7 +78,7 @@ let state = {
     zoomLevel: 1.0,
 
     exportStartTime: 0,
-    exportEndTime: 5, 
+    exportEndTime: 5,
     isDraggingStart: false,
     isDraggingEnd: false,
     isDraggingPlayhead: false,
@@ -94,17 +94,18 @@ function initApp(mode = 'pc') {
         backgroundAudio.currentTime = 0; }
     d.getElementById('selection-container')?.classList.add('hidden');
      d.getElementById('app-wrapper')?.classList.remove('hidden');
-    
+
     if (mode === 'mobile') {
         d.body.classList.add('mobile-mode');
+        setupMobileToolbar(); // <-- CORREÇÃO: Chamada da função para ativar as abas mobile
     }
-    
+
     loadAutoSavedProject();
     setupEventListeners();
     applyTheme(localStorage.getItem('music-drawing-theme') || 'dark');
     setActiveTool('pencil');
     setActiveTimbre('sine');
-    
+
     setTimeout(() => {
         resizeAndRedraw();
         if (state.history.length === 0) {
@@ -116,12 +117,12 @@ function initApp(mode = 'pc') {
 function resizeAndRedraw() {
     const canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
     const canvasHeight = el.mainCanvasArea.offsetHeight;
-    
+
     if(canvasHeight <= 0) {
         setTimeout(resizeAndRedraw, 100);
         return;
     }
-    
+
     el.canvas.width = canvasWidth;
     el.canvas.height = canvasHeight;
     el.canvasContainer.style.width = `${canvasWidth}px`;
@@ -129,7 +130,7 @@ function resizeAndRedraw() {
 
     el.yRulerCanvas.width = el.yRulerContainer.offsetWidth;
     el.yRulerCanvas.height = canvasHeight;
-    
+
     el.xRulerCanvas.width = canvasWidth;
     el.xRulerCanvas.height = el.xRulerContainer.offsetHeight;
 
@@ -138,7 +139,7 @@ function resizeAndRedraw() {
 
 function redrawAll() {
     ctx.clearRect(0, 0, el.canvas.width / state.zoomLevel, el.canvas.height / state.zoomLevel);
-    
+
     ctx.save();
     ctx.scale(state.zoomLevel, state.zoomLevel);
 
@@ -156,7 +157,7 @@ function redrawAll() {
         ctx.stroke();
     });
     state.composition.symbols.forEach(s => drawSymbol(s));
-    
+
     if (state.isSelecting) {
         drawMarquee();
     }
@@ -168,7 +169,7 @@ function redrawAll() {
         }
     });
 
-    ctx.restore(); 
+    ctx.restore();
     drawRulers();
     updateExportSelectionVisuals();
 }
@@ -190,10 +191,10 @@ function drawRulers() {
     const xZoom = state.zoomLevel;
     const startSec = Math.floor(xScroll / (PIXELS_PER_SECOND * xZoom));
     const endSec = Math.ceil((xScroll + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
-    
+
     for (let sec = startSec; sec <= endSec; sec++) {
         const xPos = (sec * PIXELS_PER_SECOND * xZoom) - xScroll;
-        
+
         let isMajorTick = false;
         if (xZoom > 2) isMajorTick = (sec % 1 === 0);
         else if (xZoom > 0.5) isMajorTick = (sec % 5 === 0);
@@ -226,16 +227,16 @@ function drawRulers() {
     } else if (yZoom < 3.0) {
         minorStep = 50;
         majorStep = 100;
-    } else { 
+    } else {
         minorStep = 20;
         majorStep = 100;
     }
 
-    const drawnLabels = []; 
+    const drawnLabels = [];
     const loopIncrement = minorStep / 2;
 
     for (let freq = FREQ_MIN; freq <= FREQ_MAX; freq += loopIncrement) {
-        
+
         let isMajor = freq % majorStep === 0;
         let isMinor = freq % minorStep === 0;
 
@@ -244,12 +245,12 @@ function drawRulers() {
         const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
 
         if (yPos < -10 || yPos > el.yRulerCanvas.height + 10) continue;
-        
+
 
         if (isMajor) {
             let collision = false;
             for (const drawnY of drawnLabels) {
-                if (Math.abs(drawnY - yPos) < 12) { 
+                if (Math.abs(drawnY - yPos) < 12) {
                     collision = true;
                     break;
                 }
@@ -288,9 +289,9 @@ function setupMobileToolbar() {
 // --- EVENT HANDLING ---
 function setupEventListeners() {
     window.addEventListener('resize', resizeAndRedraw);
-    el.mainCanvasArea.addEventListener('scroll', redrawAll); 
-    el.xRulerCanvas.addEventListener('click', handleTimelineClick); 
-    
+    el.mainCanvasArea.addEventListener('scroll', redrawAll);
+    el.xRulerCanvas.addEventListener('click', handleTimelineClick);
+
     const canvasEvents = {
         'mousedown': startAction, 'mouseup': stopAction, 'mouseleave': stopAction, 'mousemove': performAction,
         'touchstart': startAction, 'touchend': stopAction, 'touchcancel': stopAction, 'touchmove': performAction
@@ -298,15 +299,15 @@ function setupEventListeners() {
     Object.entries(canvasEvents).forEach(([event, listener]) => {
         el.canvas.addEventListener(event, listener, { passive: false });
     });
-    
+
     el.playBtn.addEventListener('click', togglePlayback);
-    el.resetViewBtn.addEventListener('click', resetView); 
+    el.resetViewBtn.addEventListener('click', resetView);
     el.clearBtn.addEventListener('click', handleClear);
     el.themeToggle.addEventListener('click', () => applyTheme(d.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
-    
+
     Object.keys(el.tools).forEach(key => el.tools[key]?.addEventListener('click', () => setActiveTool(key)));
     Object.keys(el.timbres).forEach(key => el.timbres[key]?.addEventListener('click', () => setActiveTimbre(key)));
-    
+
     el.zoomInBtn.addEventListener('click', () => handleZoom(true));
     el.zoomOutBtn.addEventListener('click', () => handleZoom(false));
 
@@ -320,14 +321,24 @@ function setupEventListeners() {
 
     el.undoBtn.addEventListener('click', undo);
     el.redoBtn.addEventListener('click', redo);
-    
+
+    // --- CORREÇÃO: Adicionando eventos de toque para os puxadores de exportação ---
     el.exportStartHandle.addEventListener('mousedown', () => { state.isDraggingStart = true; });
     el.exportEndHandle.addEventListener('mousedown', () => { state.isDraggingEnd = true; });
+    el.exportStartHandle.addEventListener('touchstart', (e) => { e.preventDefault(); state.isDraggingStart = true; }, { passive: false });
+    el.exportEndHandle.addEventListener('touchstart', (e) => { e.preventDefault(); state.isDraggingEnd = true; }, { passive: false });
+
     window.addEventListener('mousemove', handleExportDrag);
-    window.addEventListener('mouseup', () => {
+    window.addEventListener('touchmove', handleExportDrag, { passive: false });
+
+    const stopExportDrag = () => {
         state.isDraggingStart = false;
         state.isDraggingEnd = false;
-    });
+    };
+    window.addEventListener('mouseup', stopExportDrag);
+    window.addEventListener('touchend', stopExportDrag);
+    window.addEventListener('touchcancel', stopExportDrag);
+    // --- Fim da Correção ---
 
     el.playhead.addEventListener('mousedown', startPlayheadDrag);
     window.addEventListener('mousemove', handlePlayheadDrag);
@@ -335,7 +346,7 @@ function setupEventListeners() {
     el.playhead.addEventListener('touchstart', startPlayheadDrag, { passive: false });
     window.addEventListener('touchmove', handlePlayheadDrag, { passive: false });
     window.addEventListener('touchend', stopPlayheadDrag);
-    
+
     window.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -353,20 +364,20 @@ function setupEventListeners() {
         } else if (isCtrlCmd && e.key.toLowerCase() === 'v') {
             e.preventDefault();
             pasteElements();
-        } else if (isCtrlCmd && e.key === 'z') { 
-            e.preventDefault(); 
-            undo(); 
-        } else if (isCtrlCmd && e.key === 'y') { 
-            e.preventDefault(); 
-            redo(); 
-        } else if (isCtrlCmd && e.key === 's') { 
-            e.preventDefault(); 
-            saveProject(); 
+        } else if (isCtrlCmd && e.key === 'z') {
+            e.preventDefault();
+            undo();
+        } else if (isCtrlCmd && e.key === 'y') {
+            e.preventDefault();
+            redo();
+        } else if (isCtrlCmd && e.key === 's') {
+            e.preventDefault();
+            saveProject();
         } else if (e.key === 'Delete' || e.key === 'Backspace') {
             e.preventDefault();
             deleteSelectedElements();
         } else if (e.key === ' ' && e.target === d.body) {
-            e.preventDefault(); 
+            e.preventDefault();
             togglePlayback();
         }
     });
@@ -376,16 +387,16 @@ function getEventPos(e) {
     const rect = el.mainCanvasArea.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
+
     const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
     const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
-    
+
     return { x, y };
 }
 
 function startAction(e) {
     if (e.target === el.playhead) return;
-    
+
     e.preventDefault();
     initAudio();
     const pos = getEventPos(e);
@@ -455,7 +466,7 @@ function stopAction(e) {
         el.canvas.style.cursor = 'pointer';
         saveState();
     }
-    
+
     if (state.isSelecting) {
         const r1 = {
             x: state.selectionStart.x,
@@ -476,11 +487,11 @@ function stopAction(e) {
         state.isSelecting = false;
         redrawAll();
     }
-    
+
     state.isDrawing = false;
-    
+
     if (state.activeTool === 'hand') {
-        setActiveTool('hand'); 
+        setActiveTool('hand');
         return;
     }
     if (['select', 'glissando'].includes(state.activeTool)) {
@@ -517,7 +528,7 @@ function performAction(e) {
         redrawAll();
         return;
     }
-    
+
     if (state.activeTool === 'hand') {
         const rawPos = { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
         const rawLastPos = { x: state.lastPos.rawX, y: state.lastPos.rawY };
@@ -539,7 +550,7 @@ function performAction(e) {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (!currentStroke) return;
         currentStroke.points.push(pos);
-        redrawAll(); 
+        redrawAll();
         state.lastPos = pos;
     } else if (state.activeTool === 'eraser') {
         eraseAt(pos.x, pos.y);
@@ -558,11 +569,11 @@ function handleZoom(zoomIn) {
 
     const pointX = viewCenterX / oldZoom;
     const pointY = viewCenterY / oldZoom;
-    
+
     state.zoomLevel = newZoom;
     el.canvasContainer.style.transform = `scale(${newZoom})`;
     el.canvasContainer.style.transformOrigin = '0 0';
-    
+
     const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
     const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
 
@@ -581,16 +592,16 @@ function handleTimelineClick(e) {
     const clickX = e.clientX - rect.left;
 
     const canvasX = (clickX + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
-    
+
     let newStartTime = canvasX / PIXELS_PER_SECOND;
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
     state.playbackStartTime = newStartTime;
-    
+
     updatePlayheadPosition();
 
     el.mainCanvasArea.scrollLeft = (state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel) - (el.mainCanvasArea.offsetWidth / 4);
-    
+
     redrawAll();
 }
 
@@ -608,13 +619,13 @@ function startPlayheadDrag(e) {
 function handlePlayheadDrag(e) {
     if (!state.isDraggingPlayhead) return;
     e.preventDefault();
-    
+
     const rect = el.mainCanvasArea.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const xPosOnCanvasArea = clientX - rect.left;
 
     const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
-    
+
     let newStartTime = canvasX / PIXELS_PER_SECOND;
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
@@ -669,7 +680,7 @@ function drawSymbol(s) {
     ctx.strokeStyle = s.color;
     const size = s.size;
     ctx.lineWidth = Math.max(2, size / 10);
-    
+
     switch(s.type) {
         case 'staccato': ctx.beginPath(); ctx.arc(s.x, s.y, size / 4, 0, 2 * Math.PI); ctx.fill(); break;
         case 'percussion': ctx.beginPath(); ctx.moveTo(s.x - size/2, s.y - size/2); ctx.lineTo(s.x + size/2, s.y + size/2); ctx.moveTo(s.x + size/2, s.y - size/2); ctx.lineTo(s.x - size/2, s.y + size/2); ctx.stroke(); break;
@@ -691,7 +702,7 @@ function eraseAt(x, y) {
     const initialSymbolCount = state.composition.symbols.length;
     state.composition.symbols = state.composition.symbols.filter(s => ((s.x - x)**2 + (s.y - y)**2) > eraseRadiusSquared);
     if (state.composition.symbols.length < initialSymbolCount) somethingWasErased = true;
-    
+
     state.composition.strokes.forEach(stroke => {
         const initialLength = stroke.points.length;
         stroke.points = stroke.points.filter(p => ((p.x - x)**2 + (p.y - y)**2) > eraseRadiusSquared);
@@ -711,12 +722,12 @@ function moveSelectedElements(dx, dy) {
     state.selectedElements.forEach(id => {
         const element = findElementById(id);
         if (element) {
-            if (element.points) { 
+            if (element.points) {
                 element.points.forEach(p => {
                     p.x += dx;
                     p.y += dy;
                 });
-            } else { 
+            } else {
                 element.x += dx;
                 element.y += dy;
                 if (typeof element.endX !== 'undefined') {
@@ -845,7 +856,7 @@ function isPointNearLine(p, a, b, tolerance) {
 }
 
 function getElementAtPos(pos) {
-    const tolerance = 10; 
+    const tolerance = 10;
     for (let i = state.composition.symbols.length - 1; i >= 0; i--) {
         const s = state.composition.symbols[i];
         const box = getElementBoundingBox(s);
@@ -876,7 +887,7 @@ function doRectsIntersect(r1, r2) {
     const elX2 = r2.x + r2.width;
     const elY1 = r2.y;
     const elY2 = r2.y + r2.height;
-    
+
     return !(selX2 < elX1 || elX2 < selX1 || selY2 < elY1 || elY2 < selY1);
 }
 
@@ -1000,10 +1011,10 @@ function startPlayback() {
     initAudio().then(() => {
         if (!state.audioCtx) return;
         if (state.audioCtx.state === 'suspended') state.audioCtx.resume();
-        
+
         state.isPlaying = true;
         updatePlaybackUI(true);
-        
+
         const startX = state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel;
         if (Math.abs(el.mainCanvasArea.scrollLeft - startX) > el.mainCanvasArea.offsetWidth) {
              el.mainCanvasArea.scrollLeft = startX - 100;
@@ -1016,7 +1027,7 @@ function startPlayback() {
 
 function stopPlayback() {
     state.isPlaying = false;
-    
+
     state.sourceNodes.forEach(node => {
         try { node.stop(0); } catch(e) {}
     });
@@ -1025,23 +1036,23 @@ function stopPlayback() {
     if (state.audioCtx) {
         state.audioCtx.close().then(() => state.audioCtx = null);
     }
-    
+
     cancelAnimationFrame(state.animationFrameId);
-    updatePlaybackUI(false); 
+    updatePlaybackUI(false);
 }
 
 function animatePlayhead() {
     if (!state.isPlaying || !state.audioCtx) return;
-    
+
     const audioContextStartTime = state.audioCtx.currentTime;
     const canvasStartPosInSeconds = state.playbackStartTime;
 
     function frame() {
         if (!state.isPlaying || !state.audioCtx) return;
-        
+
         const elapsedTime = state.audioCtx.currentTime - audioContextStartTime;
         const currentPosInSeconds = canvasStartPosInSeconds + elapsedTime;
-        
+
         if (currentPosInSeconds >= MAX_DURATION_SECONDS) {
             stopPlayback();
             return;
@@ -1064,21 +1075,21 @@ function animatePlayhead() {
 function scheduleAllSounds(audioCtx) {
     const now = audioCtx.currentTime;
     state.sourceNodes = [];
-    
+
     const mainOut = audioCtx.createGain();
     const reverbNode = audioCtx.createConvolver();
     reverbNode.buffer = createImpulseResponse(audioCtx, 1.5, 2);
     const reverbGain = audioCtx.createGain();
     reverbGain.gain.value = parseFloat(el.reverbSlider.value);
     mainOut.connect(reverbNode).connect(reverbGain).connect(audioCtx.destination);
-    
+
     const dryGain = audioCtx.createGain();
     dryGain.gain.value = 1.0;
     mainOut.connect(dryGain).connect(audioCtx.destination);
 
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
-        
+
         const xCoords = stroke.points.map(p => p.x);
         const minX = Math.min(...xCoords);
         const maxX = Math.max(...xCoords);
@@ -1103,13 +1114,13 @@ function scheduleAllSounds(audioCtx) {
         for (let i = 0; i < freqValues.length; i++) {
             const timeInStroke = i / 100;
             const xPosInStroke = minX + timeInStroke * PIXELS_PER_SECOND;
-            
+
             while(currentPointIndex < stroke.points.length - 2 && stroke.points[currentPointIndex + 1].x < xPosInStroke) {
                 currentPointIndex++;
             }
             const p1 = stroke.points[currentPointIndex];
             const p2 = stroke.points[currentPointIndex + 1];
-            
+
             const segmentProgress = (p2.x - p1.x === 0) ? 0 : (xPosInStroke - p1.x) / (p2.x - p1.x);
             const interpolatedY = p1.y + (p2.y - p1.y) * segmentProgress;
             freqValues[i] = yToFrequency(interpolatedY);
@@ -1131,7 +1142,7 @@ function scheduleAllSounds(audioCtx) {
 
     state.composition.symbols.forEach(s => {
         const symbolStartTime = s.x / PIXELS_PER_SECOND;
-        
+
         if (symbolStartTime < state.playbackStartTime) {
             return;
         }
@@ -1186,14 +1197,14 @@ function createTone(audioCtx, opts, mainOut) {
         const carrier = audioCtx.createOscillator(); carrier.type = 'sine';
         if(opts.freqValues) carrier.frequency.setValueCurveAtTime(opts.freqValues, opts.startTime, duration);
         else carrier.frequency.setValueAtTime(opts.startFreq, opts.startTime);
-        
+
         const modulator = audioCtx.createOscillator(); modulator.type = 'square';
         modulator.frequency.value = (opts.startFreq || 200) * 1.5;
         const modGain = audioCtx.createGain(); modGain.gain.value = (opts.startFreq || 200) * 0.75;
-        
+
         modulator.connect(modGain).connect(carrier.frequency);
         osc = audioCtx.createGain(); carrier.connect(osc);
-        
+
         modulator.start(opts.startTime); modulator.stop(opts.endTime);
         carrier.start(opts.startTime); carrier.stop(opts.endTime);
         state.sourceNodes.push(modulator, carrier);
@@ -1201,14 +1212,14 @@ function createTone(audioCtx, opts, mainOut) {
         osc = audioCtx.createOscillator();
         osc.type = opts.type === 'pulse' ? 'square' : opts.type;
     }
-    
+
     if (opts.freqValues && osc.frequency) {
         osc.frequency.setValueCurveAtTime(opts.freqValues, opts.startTime, duration);
     } else if (opts.startFreq && osc.frequency) {
         osc.frequency.setValueAtTime(opts.startFreq, opts.startTime);
         if (opts.endFreq) osc.frequency.linearRampToValueAtTime(opts.endFreq, opts.endTime);
     }
-    
+
     const mainGain = audioCtx.createGain();
     mainGain.gain.setValueAtTime(0, opts.startTime);
     mainGain.gain.linearRampToValueAtTime(opts.vol, opts.startTime + 0.01);
@@ -1217,7 +1228,7 @@ function createTone(audioCtx, opts, mainOut) {
 
     const panner = audioCtx.createStereoPanner();
     panner.pan.setValueAtTime(opts.pan, opts.startTime);
-    
+
     let lastNode = mainGain;
     const activeFilter = getActiveEffect(opts.x, 'filter');
     if (activeFilter) {
@@ -1229,12 +1240,12 @@ function createTone(audioCtx, opts, mainOut) {
         lastNode = filterNode;
     }
     lastNode.connect(panner);
-    
+
     const activeDelay = getActiveEffect(opts.x, 'delay');
     if (activeDelay) {
         const delayNode = audioCtx.createDelay(parseFloat(el.delayTimeSlider.max));
         delayNode.delayTime.value = parseFloat(el.delayTimeSlider.value);
-        
+
         const feedbackNode = audioCtx.createGain();
         feedbackNode.gain.value = parseFloat(el.delayFeedbackSlider.value);
 
@@ -1244,7 +1255,7 @@ function createTone(audioCtx, opts, mainOut) {
     } else {
         panner.connect(mainOut);
     }
-    
+
     osc.connect(mainGain);
     osc.start(opts.startTime);
     osc.stop(opts.endTime);
@@ -1256,7 +1267,7 @@ function updatePlaybackUI(isPlaying) {
     el.playIcon.classList.toggle('hidden', isPlaying);
     el.pauseIcon.classList.toggle('hidden', !isPlaying);
     el.playBtnText.textContent = isPlaying ? "Parar" : "Tocar";
-    
+
     if (isPlaying) {
         el.playhead.classList.remove('hidden');
     } else {
@@ -1316,14 +1327,14 @@ function setActiveTool(toolName) {
     state.glissandoStart = null;
     Object.values(el.tools).forEach(btn => btn?.classList.remove('active'));
     el.tools[toolName]?.classList.add('active');
-    
+
     let cursor = 'crosshair';
     if (toolName === 'select') cursor = 'pointer';
     else if (toolName === 'hand') cursor = 'grab';
     else if (toolName === 'eraser') cursor = `url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="rgba(255,255,255,0.5)" stroke="black" stroke-width="2"><circle cx="12" cy="12" r="10" stroke-dasharray="2,2"/></svg>') 12 12, auto`;
     else if (toolName === 'glissando') cursor = 'pointer';
     else if (['staccato', 'percussion', 'arpeggio', 'granular', 'tremolo', 'filter', 'delay'].includes(toolName)) cursor = 'copy';
-    
+
     el.canvas.style.cursor = cursor;
 }
 
@@ -1343,20 +1354,25 @@ function applyTheme(theme) {
 
 // --- Funções da Seleção de Exportação ---
 
+// --- CORREÇÃO: Modificada para aceitar eventos de mouse e toque ---
 function handleExportDrag(e) {
     if (!state.isDraggingStart && !state.isDraggingEnd) return;
     
+    // Previne o comportamento padrão do toque, como rolagem da página
+    if (e.touches) e.preventDefault();
+    
     const rect = el.xRulerContainer.getBoundingClientRect();
-    const xPosOnRuler = e.clientX - rect.left;
-    
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const xPosOnRuler = clientX - rect.left;
+
     const time = ((el.mainCanvasArea.scrollLeft / state.zoomLevel) + (xPosOnRuler / state.zoomLevel)) / PIXELS_PER_SECOND;
-    
+
     if (state.isDraggingStart) {
-        state.exportStartTime = Math.max(0, Math.min(time, state.exportEndTime - 0.1)); 
+        state.exportStartTime = Math.max(0, Math.min(time, state.exportEndTime - 0.1));
     } else if (state.isDraggingEnd) {
-        state.exportEndTime = Math.min(MAX_DURATION_SECONDS, Math.max(time, state.exportStartTime + 0.1)); 
+        state.exportEndTime = Math.min(MAX_DURATION_SECONDS, Math.max(time, state.exportStartTime + 0.1));
     }
-    
+
     updateExportSelectionVisuals();
 }
 
@@ -1372,7 +1388,7 @@ function updateExportSelectionVisuals() {
 
     const overlayStart = state.exportStartTime * PIXELS_PER_SECOND;
     const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND;
-    
+
     el.exportSelectionOverlay.style.left = `${overlayStart}px`;
     el.exportSelectionOverlay.style.width = `${overlayEnd - overlayStart}px`;
 }
@@ -1384,10 +1400,10 @@ function exportJpg() {
         tempCanvas.width = el.canvas.width;
         tempCanvas.height = el.canvas.height;
         const tempCtx = tempCanvas.getContext('2d');
-        
+
         tempCtx.fillStyle = getComputedStyle(d.documentElement).getPropertyValue('--bg-dark').trim();
         tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
-        
+
         tempCtx.drawImage(el.canvas, 0, 0);
 
         const link = d.createElement('a');
@@ -1408,9 +1424,9 @@ function exportPdf() {
         tempCtx.fillStyle = getComputedStyle(d.documentElement).getPropertyValue('--bg-dark').trim();
         tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
         tempCtx.drawImage(el.canvas, 0, 0);
-        
+
         const imgData = tempCanvas.toDataURL('image/jpeg', 0.8);
-        
+
         const orientation = tempCanvas.width > tempCanvas.height ? 'l' : 'p';
         const pdf = new jsPDF({
             orientation: orientation,
@@ -1435,40 +1451,40 @@ async function exportWav() {
     }
 
     el.loadingOverlay.classList.remove('hidden');
-    
+
     const duration = exportEndTime - exportStartTime;
     const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * duration, 44100);
 
     const scheduleForExport = (audioCtx) => {
-        const now = 0; 
-        
+        const now = 0;
+
         const mainOut = audioCtx.createGain();
         mainOut.connect(audioCtx.destination);
-    
+
         state.composition.strokes.forEach(stroke => {
             if (stroke.points.length < 2) return;
-            
+
             const strokeStart = stroke.points[0].x / PIXELS_PER_SECOND;
             const strokeEnd = stroke.points[stroke.points.length - 1].x / PIXELS_PER_SECOND;
-            
+
             if (strokeEnd < exportStartTime || strokeStart > exportEndTime) return;
-            
+
             const scheduledStartTime = Math.max(0, strokeStart - exportStartTime);
             let strokeDuration = strokeEnd - strokeStart;
             if (strokeDuration <=0) strokeDuration = 0.1;
-            
+
             const freqValues = new Float32Array(Math.ceil(strokeDuration * 100));
              let currentPointIndex = 0;
             for (let i = 0; i < freqValues.length; i++) {
                 const timeInStroke = i / 100;
                 const xPosInStroke = stroke.points[0].x + timeInStroke * PIXELS_PER_SECOND;
-                
+
                 while(currentPointIndex < stroke.points.length - 2 && stroke.points[currentPointIndex + 1].x < xPosInStroke) {
                     currentPointIndex++;
                 }
                 const p1 = stroke.points[currentPointIndex];
                 const p2 = stroke.points[currentPointIndex + 1];
-                
+
                 const segmentProgress = (p2.x - p1.x === 0) ? 0 : (xPosInStroke - p1.x) / (p2.x - p1.x);
                 const interpolatedY = p1.y + (p2.y - p1.y) * segmentProgress;
                 freqValues[i] = yToFrequency(interpolatedY);
@@ -1487,7 +1503,7 @@ async function exportWav() {
                 x: stroke.points[0].x
             }, mainOut);
         });
-    
+
         state.composition.symbols.forEach(s => {
             const symbolTime = s.x / PIXELS_PER_SECOND;
             if (symbolTime < exportStartTime || symbolTime > exportEndTime) return;
@@ -1525,7 +1541,7 @@ async function exportWav() {
             }
         });
     };
-    
+
     scheduleForExport(offlineCtx);
 
     try {
@@ -1579,12 +1595,12 @@ function bufferToWav(buffer) {
 
     while (pos < length) {
         for (i = 0; i < numOfChan; i++) {
-            sample = Math.max(-1, Math.min(1, channels[i][offset])); 
-            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; 
-            view.setInt16(pos, sample, true); 
+            sample = Math.max(-1, Math.min(1, channels[i][offset]));
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+            view.setInt16(pos, sample, true);
             pos += 2;
         }
-        offset++; 
+        offset++;
     }
 
     return bufferArr;
@@ -1602,11 +1618,11 @@ function bufferToWav(buffer) {
 
 function simplify(points, tolerance) {
     if (points.length <= 2) return points;
-    
+
     let dmax = 0;
     let index = 0;
     const end = points.length - 1;
-    
+
     for (let i = 1; i < end; i++) {
         const d = perpendicularDistance(points[i], points[0], points[end]);
         if (d > dmax) {
@@ -1614,11 +1630,11 @@ function simplify(points, tolerance) {
             dmax = d;
         }
     }
-    
+
     if (dmax > tolerance) {
         const recResults1 = simplify(points.slice(0, index + 1), tolerance);
         const recResults2 = simplify(points.slice(index), tolerance);
-        
+
         return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
     } else {
         return [points[0], points[end]];
@@ -1639,10 +1655,10 @@ function perpendicularDistance(point, lineStart, lineEnd) {
     const pvy = point.y - lineStart.y;
 
     const pvdot = dx * pvx + dy * pvy;
-    
+
     const ax = pvx - pvdot * dx;
     const ay = pvy - pvdot * dy;
-    
+
     return Math.sqrt(ax * ax + ay * ay);
 }
 
@@ -1656,7 +1672,7 @@ d.addEventListener('DOMContentLoaded', () => {
         pcModeBtn.addEventListener('click', () => initApp('pc'));
         mobileModeBtn.addEventListener('click', () => initApp('mobile'));
     }
-    
+
     const selectionContainer = d.getElementById('selection-container');
     const backgroundAudio = d.getElementById('background-audio');
 
