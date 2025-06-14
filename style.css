@@ -111,6 +111,60 @@ main#canvas-wrapper {
     min-width: 0;
     min-height: 0;
 }
+#playhead {
+    width: 2px;
+    height: 100%;
+    background-color: var(--primary-glow);
+    box-shadow: 0 0 10px var(--primary-glow);
+    position: absolute;
+    top: 0;
+    left: 0;
+    transform: translateX(0);
+    z-index: 5;
+    pointer-events: all; /* Garante que o playhead seja clicável */
+    cursor: ew-resize; /* Cursor para indicar o arraste horizontal */
+}
+
+#export-selection-overlay {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background-color: rgba(0, 180, 255, 0.1);
+    border-left: 1px dashed rgba(169, 114, 255, 0.7);
+    border-right: 1px dashed rgba(169, 114, 255, 0.7);
+    pointer-events: none;
+    z-index: 3;
+    box-sizing: border-box;
+}
+
+#x-ruler-container {
+    position: relative;
+}
+
+.ruler-handle {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    width: 10px;
+    cursor: ew-resize;
+    z-index: 10;
+    transform: translateX(-5px);
+}
+
+.ruler-handle::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 0;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 100%;
+    background-color: var(--selection-glow);
+    border-radius: 2px;
+    box-shadow: 0 0 8px var(--selection-glow);
+}
+
+
 
 /* Hide mobile-only elements on PC */
 #mobile-toolbar-tabs { display: none; }

@@ -15,6 +15,7 @@ const ZOOM_STEP = 0.1;
 // --- DOM ELEMENTS ---
 const el = {
     playBtn: d.getElementById('playBtn'), playIcon: d.getElementById('playIcon'), pauseIcon: d.getElementById('pauseIcon'), playBtnText: d.querySelector('#playBtn span'),
+    resetViewBtn: d.getElementById('resetViewBtn'), 
     playhead: d.getElementById('playhead'), colorPicker: d.getElementById('colorPicker'), lineWidth: d.getElementById('lineWidth'),
     clearBtn: d.getElementById('clearBtn'), 
     reverbSlider: d.getElementById('reverb'), 
@@ -28,10 +29,11 @@ const el = {
     importProjectBtn: d.getElementById('importProjectBtn'),
     musdrImporter: d.getElementById('musdrImporter'),
 
+    exportBtn: d.getElementById('exportBtn'), // Referência ao botão principal
     exportJpgBtn: d.getElementById('exportJpgBtn'), exportPdfBtn: d.getElementById('exportPdfBtn'), exportWavBtn: d.getElementById('exportWavBtn'),
     undoBtn: d.getElementById('undoBtn'), redoBtn: d.getElementById('redoBtn'),
-    zoomInBtn: d.getElementById('zoomInBtn'), // NEW
-    zoomOutBtn: d.getElementById('zoomOutBtn'), // NEW
+    zoomInBtn: d.getElementById('zoomInBtn'), 
+    zoomOutBtn: d.getElementById('zoomOutBtn'), 
     
     canvas: d.getElementById('drawingCanvas'),
     canvasContainer: d.getElementById('canvas-container'),
@@ -40,6 +42,10 @@ const el = {
     xRulerCanvas: d.getElementById('x-ruler-canvas'),
     xRulerContainer: d.getElementById('x-ruler-container'),
     yRulerContainer: d.getElementById('y-ruler-container'),
+
+    exportSelectionOverlay: d.getElementById('export-selection-overlay'),
+    exportStartHandle: d.getElementById('export-start-handle'),
+    exportEndHandle: d.getElementById('export-end-handle'),
 
     tools: { select: d.getElementById('select'), pencil: d.getElementById('pencil'), eraser: d.getElementById('eraser'), hand: d.getElementById('hand'), glissando: d.getElementById('glissando'), staccato: d.getElementById('staccato'), percussion: d.getElementById('percussion'), arpeggio: d.getElementById('arpeggio'), granular: d.getElementById('granular'), tremolo: d.getElementById('tremolo'), filter: d.getElementById('filter'), delay: d.getElementById('delay') },
     timbres: { sine: d.getElementById('sine'), square: d.getElementById('square'), sawtooth: d.getElementById('sawtooth'), triangle: d.getElementById('triangle'), fm: d.getElementById('fm'), pulse: d.getElementById('pulse') }
@@ -61,6 +67,7 @@ let state = {
     lastPos: { x: 0, y: 0 },
     glissandoStart: null,
     isPlaying: false,
+    playbackStartTime: 0, 
     animationFrameId: null,
     audioCtx: null,
     sourceNodes: [],
@@ -68,7 +75,13 @@ let state = {
     history: [],
     historyIndex: -1,
     selectedElements: [],
-    zoomLevel: 1.0, // NEW
+    zoomLevel: 1.0,
+
+    exportStartTime: 0,
+    exportEndTime: 5, 
+    isDraggingStart: false,
+    isDraggingEnd: false,
+    isDraggingPlayhead: false,
 };
 let clipboard = [];
 
@@ -84,7 +97,6 @@ function initApp(mode = 'pc') {
     
     if (mode === 'mobile') {
         d.body.classList.add('mobile-mode');
-        setupMobileToolbar();
     }
     
     loadAutoSavedProject();
@@ -127,7 +139,6 @@ function resizeAndRedraw() {
 function redrawAll() {
     ctx.clearRect(0, 0, el.canvas.width / state.zoomLevel, el.canvas.height / state.zoomLevel);
     
-    // Apply zoom transformation
     ctx.save();
     ctx.scale(state.zoomLevel, state.zoomLevel);
 
@@ -157,16 +168,15 @@ function redrawAll() {
         }
     });
 
-    ctx.restore(); // Restore from zoom
+    ctx.restore(); 
     drawRulers();
+    updateExportSelectionVisuals();
 }
 
 function drawRulers() {
-    // Clear rulers
     xRulerCtx.clearRect(0, 0, el.xRulerCanvas.width, el.xRulerCanvas.height);
     yRulerCtx.clearRect(0, 0, el.yRulerCanvas.width, el.yRulerCanvas.height);
 
-    // Get styles
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
     const rulerFont = '9px Inter';
 
@@ -197,25 +207,63 @@ function drawRulers() {
         }
     }
 
-    // Y-Ruler (Frequency)
+    // --- Y-Ruler (Frequency) ---
     yRulerCtx.fillStyle = textColor;
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
     yRulerCtx.textBaseline = 'middle';
-    
+
     const yScroll = el.mainCanvasArea.scrollTop;
     const yZoom = state.zoomLevel;
 
-    for(let freq = FREQ_MIN; freq <= FREQ_MAX; freq += 50) {
-        const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
+    let minorStep, majorStep;
+    if (yZoom < 0.75) {
+        minorStep = 200;
+        majorStep = 400;
+    } else if (yZoom < 1.5) {
+        minorStep = 100;
+        majorStep = 200;
+    } else if (yZoom < 3.0) {
+        minorStep = 50;
+        majorStep = 100;
+    } else { 
+        minorStep = 20;
+        majorStep = 100;
+    }
+
+    const drawnLabels = []; 
+    const loopIncrement = minorStep / 2;
+
+    for (let freq = FREQ_MIN; freq <= FREQ_MAX; freq += loopIncrement) {
         
-        if (yPos > 0 && yPos < el.mainCanvasArea.offsetHeight) {
-            if (freq % 200 === 0) {
+        let isMajor = freq % majorStep === 0;
+        let isMinor = freq % minorStep === 0;
+
+        if (!isMajor && !isMinor) continue;
+
+        const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
+
+        if (yPos < -10 || yPos > el.yRulerCanvas.height + 10) continue;
+        
+
+        if (isMajor) {
+            let collision = false;
+            for (const drawnY of drawnLabels) {
+                if (Math.abs(drawnY - yPos) < 12) { 
+                    collision = true;
+                    break;
+                }
+            }
+
+            if (!collision) {
                 yRulerCtx.fillRect(el.yRulerCanvas.width - 15, yPos, 15, 1);
                 yRulerCtx.fillText(`${Math.round(freq)}`, el.yRulerCanvas.width - 20, yPos);
-            } else if (yZoom > 1.5 && freq % 100 === 0) {
-                 yRulerCtx.fillRect(el.yRulerCanvas.width - 10, yPos, 10, 1);
+                drawnLabels.push(yPos);
+            } else {
+                yRulerCtx.fillRect(el.yRulerCanvas.width - 10, yPos, 10, 1);
             }
+        } else if (isMinor) {
+            yRulerCtx.fillRect(el.yRulerCanvas.width - 7, yPos, 7, 1);
         }
     }
 }
@@ -228,11 +276,9 @@ function setupMobileToolbar() {
         tab.addEventListener('click', () => {
             const targetPanelId = tab.getAttribute('data-tab');
 
-            // Remove a classe 'active' de todas as abas e painéis
             tabs.forEach(t => t.classList.remove('active'));
             panels.forEach(p => p.classList.remove('active'));
 
-            // Adiciona a classe 'active' à aba clicada e ao painel correspondente
             tab.classList.add('active');
             d.querySelector(`.toolbar-panel[data-panel="${targetPanelId}"]`).classList.add('active');
         });
@@ -242,7 +288,8 @@ function setupMobileToolbar() {
 // --- EVENT HANDLING ---
 function setupEventListeners() {
     window.addEventListener('resize', resizeAndRedraw);
-    el.mainCanvasArea.addEventListener('scroll', redrawAll); // Redraw on scroll for rulers
+    el.mainCanvasArea.addEventListener('scroll', redrawAll); 
+    el.xRulerCanvas.addEventListener('click', handleTimelineClick); 
     
     const canvasEvents = {
         'mousedown': startAction, 'mouseup': stopAction, 'mouseleave': stopAction, 'mousemove': performAction,
@@ -253,13 +300,13 @@ function setupEventListeners() {
     });
     
     el.playBtn.addEventListener('click', togglePlayback);
+    el.resetViewBtn.addEventListener('click', resetView); 
     el.clearBtn.addEventListener('click', handleClear);
     el.themeToggle.addEventListener('click', () => applyTheme(d.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark'));
     
     Object.keys(el.tools).forEach(key => el.tools[key]?.addEventListener('click', () => setActiveTool(key)));
     Object.keys(el.timbres).forEach(key => el.timbres[key]?.addEventListener('click', () => setActiveTimbre(key)));
     
-    // Zoom buttons
     el.zoomInBtn.addEventListener('click', () => handleZoom(true));
     el.zoomOutBtn.addEventListener('click', () => handleZoom(false));
 
@@ -273,6 +320,21 @@ function setupEventListeners() {
 
     el.undoBtn.addEventListener('click', undo);
     el.redoBtn.addEventListener('click', redo);
+    
+    el.exportStartHandle.addEventListener('mousedown', () => { state.isDraggingStart = true; });
+    el.exportEndHandle.addEventListener('mousedown', () => { state.isDraggingEnd = true; });
+    window.addEventListener('mousemove', handleExportDrag);
+    window.addEventListener('mouseup', () => {
+        state.isDraggingStart = false;
+        state.isDraggingEnd = false;
+    });
+
+    el.playhead.addEventListener('mousedown', startPlayheadDrag);
+    window.addEventListener('mousemove', handlePlayheadDrag);
+    window.addEventListener('mouseup', stopPlayheadDrag);
+    el.playhead.addEventListener('touchstart', startPlayheadDrag, { passive: false });
+    window.addEventListener('touchmove', handlePlayheadDrag, { passive: false });
+    window.addEventListener('touchend', stopPlayheadDrag);
     
     window.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -315,18 +377,15 @@ function getEventPos(e) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     
-    // Translate viewport coordinates to canvas-data coordinates
     const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
     const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
     
     return { x, y };
 }
 
-// ... (Rest of the functions from previous steps: startAction, stopAction, performAction, etc.)
-// ... (All other helper functions for selection, copy/paste, drawing, audio also remain)
-// The following are the key modified functions for brevity.
-
 function startAction(e) {
+    if (e.target === el.playhead) return;
+    
     e.preventDefault();
     initAudio();
     const pos = getEventPos(e);
@@ -421,7 +480,7 @@ function stopAction(e) {
     state.isDrawing = false;
     
     if (state.activeTool === 'hand') {
-        setActiveTool('hand'); // To reset cursor to 'grab'
+        setActiveTool('hand'); 
         return;
     }
     if (['select', 'glissando'].includes(state.activeTool)) {
@@ -439,6 +498,7 @@ function stopAction(e) {
 }
 
 function performAction(e) {
+    if (state.isDraggingPlayhead) return;
     if (!state.isDrawing) return;
     e.preventDefault();
     const pos = getEventPos(e);
@@ -459,7 +519,6 @@ function performAction(e) {
     }
     
     if (state.activeTool === 'hand') {
-        // Panning is better handled without zoom-adjusted coordinates
         const rawPos = { x: e.touches ? e.touches[0].clientX : e.clientX, y: e.touches ? e.touches[0].clientY : e.clientY };
         const rawLastPos = { x: state.lastPos.rawX, y: state.lastPos.rawY };
         if(rawLastPos.x){
@@ -480,7 +539,7 @@ function performAction(e) {
         const currentStroke = state.composition.strokes[state.composition.strokes.length - 1];
         if (!currentStroke) return;
         currentStroke.points.push(pos);
-        redrawAll(); // Redraw for live preview with zoom
+        redrawAll(); 
         state.lastPos = pos;
     } else if (state.activeTool === 'eraser') {
         eraseAt(pos.x, pos.y);
@@ -494,7 +553,6 @@ function handleZoom(zoomIn) {
 
     if (newZoom === oldZoom) return;
 
-    // Get the canvas point under the center of the viewport
     const viewCenterX = el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth / 2;
     const viewCenterY = el.mainCanvasArea.scrollTop + el.mainCanvasArea.offsetHeight / 2;
 
@@ -505,7 +563,6 @@ function handleZoom(zoomIn) {
     el.canvasContainer.style.transform = `scale(${newZoom})`;
     el.canvasContainer.style.transformOrigin = '0 0';
     
-    // Calculate new scroll position to keep the point centered
     const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
     const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
 
@@ -514,6 +571,72 @@ function handleZoom(zoomIn) {
 
     redrawAll();
 }
+
+function handleTimelineClick(e) {
+    if (state.isPlaying) {
+        stopPlayback();
+    }
+
+    const rect = el.xRulerCanvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+
+    const canvasX = (clickX + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    
+    let newStartTime = canvasX / PIXELS_PER_SECOND;
+    newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
+
+    state.playbackStartTime = newStartTime;
+    
+    updatePlayheadPosition();
+
+    el.mainCanvasArea.scrollLeft = (state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel) - (el.mainCanvasArea.offsetWidth / 4);
+    
+    redrawAll();
+}
+
+// --- Funções de arrastar o Playhead ---
+function startPlayheadDrag(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (state.isPlaying) {
+        stopPlayback();
+    }
+    state.isDraggingPlayhead = true;
+    d.body.style.cursor = 'ew-resize';
+}
+
+function handlePlayheadDrag(e) {
+    if (!state.isDraggingPlayhead) return;
+    e.preventDefault();
+    
+    const rect = el.mainCanvasArea.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const xPosOnCanvasArea = clientX - rect.left;
+
+    const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
+    
+    let newStartTime = canvasX / PIXELS_PER_SECOND;
+    newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
+
+    state.playbackStartTime = newStartTime;
+    updatePlayheadPosition();
+}
+
+function stopPlayheadDrag() {
+    if (state.isDraggingPlayhead) {
+        state.isDraggingPlayhead = false;
+        d.body.style.cursor = 'default';
+        setActiveTool(state.activeTool); // Restaura o cursor da ferramenta
+    }
+}
+
+function updatePlayheadPosition() {
+    const playheadX = state.playbackStartTime * PIXELS_PER_SECOND;
+    el.playhead.style.transform = `translateX(${playheadX}px)`;
+    el.playhead.classList.remove('hidden');
+}
+
+
 // --- DRAWING & COMPOSITION ---
 function handleClear() {
     if (confirm("Tem certeza de que deseja limpar toda a pauta? Esta ação não pode ser desfeita.")) {
@@ -588,12 +711,12 @@ function moveSelectedElements(dx, dy) {
     state.selectedElements.forEach(id => {
         const element = findElementById(id);
         if (element) {
-            if (element.points) { // Stroke
+            if (element.points) { 
                 element.points.forEach(p => {
                     p.x += dx;
                     p.y += dy;
                 });
-            } else { // Symbol
+            } else { 
                 element.x += dx;
                 element.y += dy;
                 if (typeof element.endX !== 'undefined') {
@@ -858,7 +981,6 @@ function updateUndoRedoButtons() {
     el.redoBtn.disabled = state.historyIndex >= state.history.length - 1;
 }
 
-
 // --- AUDIO ENGINE ---
 async function initAudio() {
     if (state.audioCtx && state.audioCtx.state !== 'closed') return;
@@ -882,6 +1004,11 @@ function startPlayback() {
         state.isPlaying = true;
         updatePlaybackUI(true);
         
+        const startX = state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel;
+        if (Math.abs(el.mainCanvasArea.scrollLeft - startX) > el.mainCanvasArea.offsetWidth) {
+             el.mainCanvasArea.scrollLeft = startX - 100;
+        }
+
         scheduleAllSounds(state.audioCtx);
         animatePlayhead();
     });
@@ -900,32 +1027,33 @@ function stopPlayback() {
     }
     
     cancelAnimationFrame(state.animationFrameId);
-    updatePlaybackUI(false);
+    updatePlaybackUI(false); 
 }
 
 function animatePlayhead() {
     if (!state.isPlaying || !state.audioCtx) return;
     
-    const startTime = state.audioCtx.currentTime;
-    const startScroll = el.mainCanvasArea.scrollLeft;
-    let maxScroll = el.canvas.width - el.mainCanvasArea.clientWidth;
+    const audioContextStartTime = state.audioCtx.currentTime;
+    const canvasStartPosInSeconds = state.playbackStartTime;
 
     function frame() {
         if (!state.isPlaying || !state.audioCtx) return;
         
-        const elapsedTime = state.audioCtx.currentTime - startTime;
-        const currentX = startScroll + (elapsedTime * PIXELS_PER_SECOND);
+        const elapsedTime = state.audioCtx.currentTime - audioContextStartTime;
+        const currentPosInSeconds = canvasStartPosInSeconds + elapsedTime;
         
-        if (currentX >= el.canvas.width) {
+        if (currentPosInSeconds >= MAX_DURATION_SECONDS) {
             stopPlayback();
             return;
         }
-        
-        el.playhead.style.transform = `translateX(${currentX}px)`;
-        
-        const playheadRightEdge = currentX + 100;
-        if(playheadRightEdge > el.mainCanvasArea.scrollLeft + el.mainCanvasArea.clientWidth) {
-            el.mainCanvasArea.scrollLeft = Math.min(maxScroll, playheadRightEdge - el.mainCanvasArea.clientWidth);
+
+        state.playbackStartTime = currentPosInSeconds;
+        updatePlayheadPosition();
+
+        const currentXInPixels = state.playbackStartTime * PIXELS_PER_SECOND;
+        const playheadRightEdge = currentXInPixels + 100;
+        if (currentXInPixels > el.mainCanvasArea.scrollLeft + el.mainCanvasArea.clientWidth) {
+            el.mainCanvasArea.scrollLeft = currentXInPixels - el.mainCanvasArea.clientWidth + 100;
         }
 
         state.animationFrameId = requestAnimationFrame(frame);
@@ -951,16 +1079,30 @@ function scheduleAllSounds(audioCtx) {
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
         
-        const startTime = now + stroke.points[0].x / PIXELS_PER_SECOND;
-        const endTime = now + stroke.points[stroke.points.length - 1].x / PIXELS_PER_SECOND;
-        const duration = endTime - startTime;
-        if (duration <= 0) return;
+        const xCoords = stroke.points.map(p => p.x);
+        const minX = Math.min(...xCoords);
+        const maxX = Math.max(...xCoords);
+
+        const strokeStartTime = minX / PIXELS_PER_SECOND;
+        const strokeEndTime = maxX / PIXELS_PER_SECOND;
+
+        if (strokeStartTime < state.playbackStartTime) {
+            return;
+        }
+
+        let duration = strokeEndTime - strokeStartTime;
+        if (duration <= 0) {
+            duration = 0.1;
+        }
+
+        const timeToPlay = strokeStartTime - state.playbackStartTime;
+        const scheduledStartTime = now + timeToPlay;
 
         const freqValues = new Float32Array(Math.ceil(duration * 100));
         let currentPointIndex = 0;
         for (let i = 0; i < freqValues.length; i++) {
             const timeInStroke = i / 100;
-            const xPosInStroke = stroke.points[0].x + timeInStroke * PIXELS_PER_SECOND;
+            const xPosInStroke = minX + timeInStroke * PIXELS_PER_SECOND;
             
             while(currentPointIndex < stroke.points.length - 2 && stroke.points[currentPointIndex + 1].x < xPosInStroke) {
                 currentPointIndex++;
@@ -968,53 +1110,59 @@ function scheduleAllSounds(audioCtx) {
             const p1 = stroke.points[currentPointIndex];
             const p2 = stroke.points[currentPointIndex + 1];
             
-            const segmentProgress = (xPosInStroke - p1.x) / (p2.x - p1.x || 1);
+            const segmentProgress = (p2.x - p1.x === 0) ? 0 : (xPosInStroke - p1.x) / (p2.x - p1.x);
             const interpolatedY = p1.y + (p2.y - p1.y) * segmentProgress;
             freqValues[i] = yToFrequency(interpolatedY);
         }
 
         const vol = 0.1 + (stroke.lineWidth / 50) * 0.4;
-        const pan = xToPan(stroke.points[0].x);
+        const pan = xToPan(minX);
 
         createTone(audioCtx, {
             type: stroke.timbre,
-            startTime: startTime,
-            endTime: endTime,
+            startTime: scheduledStartTime,
+            endTime: scheduledStartTime + duration,
             freqValues: freqValues,
             vol: vol,
             pan: pan,
-            x: stroke.points[0].x
+            x: minX
         }, mainOut);
     });
 
     state.composition.symbols.forEach(s => {
-        const startTime = now + (s.x / PIXELS_PER_SECOND);
+        const symbolStartTime = s.x / PIXELS_PER_SECOND;
+        
+        if (symbolStartTime < state.playbackStartTime) {
+            return;
+        }
+
+        const scheduledTime = now + (symbolStartTime - state.playbackStartTime);
         const vol = 0.1 + (s.size / 50) * 0.4;
         const pan = xToPan(s.x);
         const freq = yToFrequency(s.y);
 
         switch (s.type) {
-            case 'staccato': createTone(audioCtx, { type: 'triangle', startTime, endTime: startTime + 0.08, startFreq: freq, vol, pan, x: s.x }, mainOut); break;
-            case 'percussion': createTone(audioCtx, { type: 'noise', startTime, endTime: startTime + 0.1, vol, pan, x: s.x }, mainOut); break;
+            case 'staccato': createTone(audioCtx, { type: 'triangle', startTime: scheduledTime, endTime: scheduledTime + 0.08, startFreq: freq, vol, pan, x: s.x }, mainOut); break;
+            case 'percussion': createTone(audioCtx, { type: 'noise', startTime: scheduledTime, endTime: scheduledTime + 0.1, vol, pan, x: s.x }, mainOut); break;
             case 'arpeggio':
                 [1, 5/4, 3/2, 2].forEach((interval, i) => {
-                    createTone(audioCtx, { type: 'triangle', startTime: startTime + i * 0.05, endTime: startTime + i * 0.05 + 0.1, startFreq: freq * interval, vol: vol*0.8, pan, x: s.x }, mainOut);
+                    createTone(audioCtx, { type: 'triangle', startTime: scheduledTime + i * 0.05, endTime: scheduledTime + i * 0.05 + 0.1, startFreq: freq * interval, vol: vol*0.8, pan, x: s.x }, mainOut);
                 });
                 break;
             case 'glissando':
-                const glissEndTime = now + (s.endX / PIXELS_PER_SECOND);
-                if (glissEndTime > startTime) {
-                    createTone(audioCtx, { type: s.timbre, startTime, endTime: glissEndTime, startFreq: yToFrequency(s.y), endFreq: yToFrequency(s.endY), vol, pan, x: s.x }, mainOut);
+                const glissEndTime = scheduledTime + ((s.endX - s.x) / PIXELS_PER_SECOND);
+                if (glissEndTime > scheduledTime) {
+                    createTone(audioCtx, { type: s.timbre, startTime: scheduledTime, endTime: glissEndTime, startFreq: yToFrequency(s.y), endFreq: yToFrequency(s.endY), vol, pan, x: s.x }, mainOut);
                 }
                 break;
             case 'tremolo':
-                for (let t = startTime; t < startTime + 0.5; t += 0.05) {
-                    createTone(audioCtx, { type: 'sine', startTime: t, endTime: t + 0.1, startFreq: freq, vol: vol * 0.8, pan, x: s.x }, mainOut);
+                for (let t = 0; t < 0.5; t += 0.05) {
+                    createTone(audioCtx, { type: 'sine', startTime: scheduledTime + t, endTime: scheduledTime + t + 0.1, startFreq: freq, vol: vol * 0.8, pan, x: s.x }, mainOut);
                 }
                 break;
             case 'granular':
                 for (let i = 0; i < 20; i++) {
-                     const t = startTime + Math.random() * 0.5;
+                     const t = scheduledTime + Math.random() * 0.5;
                      createTone(audioCtx, { type: 'sine', startTime: t, endTime: t + Math.random() * 0.1 + 0.05, startFreq: yToFrequency(s.y - s.size / 2 + Math.random() * s.size), vol: Math.random() * vol, pan: pan - 0.2 + Math.random() * 0.4, x: s.x }, mainOut);
                 }
                 break;
@@ -1105,15 +1253,14 @@ function createTone(audioCtx, opts, mainOut) {
 
 // --- UTILITY & UI FUNCTIONS ---
 function updatePlaybackUI(isPlaying) {
-    el.playhead.classList.toggle('hidden', !isPlaying);
     el.playIcon.classList.toggle('hidden', isPlaying);
     el.pauseIcon.classList.toggle('hidden', !isPlaying);
     el.playBtnText.textContent = isPlaying ? "Parar" : "Tocar";
+    
     if (isPlaying) {
-         el.playhead.style.transform = `translateX(${el.mainCanvasArea.scrollLeft}px)`;
+        el.playhead.classList.remove('hidden');
     } else {
-         el.mainCanvasArea.scrollLeft = 0;
-         el.playhead.style.transform = `translateX(0px)`;
+        updatePlayheadPosition();
     }
 }
 
@@ -1124,6 +1271,16 @@ function updateExportButtonsState() {
     el.exportPdfBtn.disabled = isEmpty;
     el.exportWavBtn.disabled = isEmpty;
     el.saveProjectBtn.disabled = isEmpty;
+}
+
+function resetView() {
+    if (state.isPlaying) {
+        stopPlayback();
+    }
+    state.playbackStartTime = 0;
+    el.mainCanvasArea.scrollLeft = 0;
+    updatePlayheadPosition();
+    redrawAll();
 }
 
 function yToFrequency(y) {
@@ -1184,12 +1341,311 @@ function applyTheme(theme) {
     setTimeout(redrawAll, 50);
 }
 
+// --- Funções da Seleção de Exportação ---
+
+function handleExportDrag(e) {
+    if (!state.isDraggingStart && !state.isDraggingEnd) return;
+    
+    const rect = el.xRulerContainer.getBoundingClientRect();
+    const xPosOnRuler = e.clientX - rect.left;
+    
+    const time = ((el.mainCanvasArea.scrollLeft / state.zoomLevel) + (xPosOnRuler / state.zoomLevel)) / PIXELS_PER_SECOND;
+    
+    if (state.isDraggingStart) {
+        state.exportStartTime = Math.max(0, Math.min(time, state.exportEndTime - 0.1)); 
+    } else if (state.isDraggingEnd) {
+        state.exportEndTime = Math.min(MAX_DURATION_SECONDS, Math.max(time, state.exportStartTime + 0.1)); 
+    }
+    
+    updateExportSelectionVisuals();
+}
+
+function updateExportSelectionVisuals() {
+    const scroll = el.mainCanvasArea.scrollLeft;
+    const zoom = state.zoomLevel;
+
+    const startHandlePos = (state.exportStartTime * PIXELS_PER_SECOND * zoom) - scroll;
+    const endHandlePos = (state.exportEndTime * PIXELS_PER_SECOND * zoom) - scroll;
+
+    el.exportStartHandle.style.left = `${startHandlePos}px`;
+    el.exportEndHandle.style.left = `${endHandlePos}px`;
+
+    const overlayStart = state.exportStartTime * PIXELS_PER_SECOND;
+    const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND;
+    
+    el.exportSelectionOverlay.style.left = `${overlayStart}px`;
+    el.exportSelectionOverlay.style.width = `${overlayEnd - overlayStart}px`;
+}
+
 // --- EXPORT FUNCTIONS ---
-function exportJpg() { /* ... unchanged ... */ }
-function exportPdf() { /* ... unchanged ... */ }
-async function exportWav() { /* ... unchanged ... */ }
-function bufferToWav(buffer) { /* ... unchanged ... */ }
-function simplify(points, tolerance, highestQuality) { /* ... unchanged ... */ }
+function exportJpg() {
+    try {
+        const tempCanvas = d.createElement('canvas');
+        tempCanvas.width = el.canvas.width;
+        tempCanvas.height = el.canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        tempCtx.fillStyle = getComputedStyle(d.documentElement).getPropertyValue('--bg-dark').trim();
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        
+        tempCtx.drawImage(el.canvas, 0, 0);
+
+        const link = d.createElement('a');
+        link.href = tempCanvas.toDataURL('image/jpeg', 0.9);
+        link.download = `music-drawing-${Date.now()}.jpg`;
+        link.click();
+    } catch (e) {
+        console.error("Erro ao exportar JPG:", e);
+        alert("Não foi possível exportar a imagem como JPG.");
+    }
+}
+function exportPdf() {
+    try {
+        const tempCanvas = d.createElement('canvas');
+        tempCanvas.width = el.canvas.width;
+        tempCanvas.height = el.canvas.height;
+        const tempCtx = tempCanvas.getContext('2d');
+        tempCtx.fillStyle = getComputedStyle(d.documentElement).getPropertyValue('--bg-dark').trim();
+        tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+        tempCtx.drawImage(el.canvas, 0, 0);
+        
+        const imgData = tempCanvas.toDataURL('image/jpeg', 0.8);
+        
+        const orientation = tempCanvas.width > tempCanvas.height ? 'l' : 'p';
+        const pdf = new jsPDF({
+            orientation: orientation,
+            unit: 'px',
+            format: [tempCanvas.width, tempCanvas.height]
+        });
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, tempCanvas.width, tempCanvas.height);
+        pdf.save(`music-drawing-${Date.now()}.pdf`);
+
+    } catch (e) {
+        console.error("Erro ao exportar PDF:", e);
+        alert("Não foi possível exportar como PDF.");
+    }
+}
+
+async function exportWav() {
+    const { exportStartTime, exportEndTime } = state;
+    if (exportEndTime <= exportStartTime) {
+        alert("A seleção de exportação é inválida. O tempo final deve ser maior que o inicial.");
+        return;
+    }
+
+    el.loadingOverlay.classList.remove('hidden');
+    
+    const duration = exportEndTime - exportStartTime;
+    const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(2, 44100 * duration, 44100);
+
+    const scheduleForExport = (audioCtx) => {
+        const now = 0; 
+        
+        const mainOut = audioCtx.createGain();
+        mainOut.connect(audioCtx.destination);
+    
+        state.composition.strokes.forEach(stroke => {
+            if (stroke.points.length < 2) return;
+            
+            const strokeStart = stroke.points[0].x / PIXELS_PER_SECOND;
+            const strokeEnd = stroke.points[stroke.points.length - 1].x / PIXELS_PER_SECOND;
+            
+            if (strokeEnd < exportStartTime || strokeStart > exportEndTime) return;
+            
+            const scheduledStartTime = Math.max(0, strokeStart - exportStartTime);
+            let strokeDuration = strokeEnd - strokeStart;
+            if (strokeDuration <=0) strokeDuration = 0.1;
+            
+            const freqValues = new Float32Array(Math.ceil(strokeDuration * 100));
+             let currentPointIndex = 0;
+            for (let i = 0; i < freqValues.length; i++) {
+                const timeInStroke = i / 100;
+                const xPosInStroke = stroke.points[0].x + timeInStroke * PIXELS_PER_SECOND;
+                
+                while(currentPointIndex < stroke.points.length - 2 && stroke.points[currentPointIndex + 1].x < xPosInStroke) {
+                    currentPointIndex++;
+                }
+                const p1 = stroke.points[currentPointIndex];
+                const p2 = stroke.points[currentPointIndex + 1];
+                
+                const segmentProgress = (p2.x - p1.x === 0) ? 0 : (xPosInStroke - p1.x) / (p2.x - p1.x);
+                const interpolatedY = p1.y + (p2.y - p1.y) * segmentProgress;
+                freqValues[i] = yToFrequency(interpolatedY);
+            }
+
+            const vol = 0.1 + (stroke.lineWidth / 50) * 0.4;
+            const pan = xToPan(stroke.points[0].x);
+
+            createTone(audioCtx, {
+                type: stroke.timbre,
+                startTime: now + scheduledStartTime,
+                endTime: now + scheduledStartTime + strokeDuration,
+                freqValues: freqValues,
+                vol: vol,
+                pan: pan,
+                x: stroke.points[0].x
+            }, mainOut);
+        });
+    
+        state.composition.symbols.forEach(s => {
+            const symbolTime = s.x / PIXELS_PER_SECOND;
+            if (symbolTime < exportStartTime || symbolTime > exportEndTime) return;
+
+            const scheduledTime = now + (symbolTime - exportStartTime);
+            const vol = 0.1 + (s.size / 50) * 0.4;
+            const pan = xToPan(s.x);
+            const freq = yToFrequency(s.y);
+
+            switch (s.type) {
+                case 'staccato': createTone(offlineCtx, { type: 'triangle', startTime: scheduledTime, endTime: scheduledTime + 0.08, startFreq: freq, vol, pan, x: s.x }, mainOut); break;
+                case 'percussion': createTone(offlineCtx, { type: 'noise', startTime: scheduledTime, endTime: scheduledTime + 0.1, vol, pan, x: s.x }, mainOut); break;
+                case 'arpeggio':
+                    [1, 5/4, 3/2, 2].forEach((interval, i) => {
+                        createTone(offlineCtx, { type: 'triangle', startTime: scheduledTime + i * 0.05, endTime: scheduledTime + i * 0.05 + 0.1, startFreq: freq * interval, vol: vol*0.8, pan, x: s.x }, mainOut);
+                    });
+                    break;
+                case 'glissando':
+                    const glissEndTime = scheduledTime + ((s.endX - s.x) / PIXELS_PER_SECOND);
+                    if (glissEndTime > scheduledTime) {
+                        createTone(offlineCtx, { type: s.timbre, startTime: scheduledTime, endTime: glissEndTime, startFreq: yToFrequency(s.y), endFreq: yToFrequency(s.endY), vol, pan, x: s.x }, mainOut);
+                    }
+                    break;
+                case 'tremolo':
+                    for (let t = 0; t < 0.5; t += 0.05) {
+                        createTone(offlineCtx, { type: 'sine', startTime: scheduledTime + t, endTime: scheduledTime + t + 0.1, startFreq: freq, vol: vol * 0.8, pan, x: s.x }, mainOut);
+                    }
+                    break;
+                case 'granular':
+                    for (let i = 0; i < 20; i++) {
+                         const t = scheduledTime + Math.random() * 0.5;
+                         createTone(offlineCtx, { type: 'sine', startTime: t, endTime: t + Math.random() * 0.1 + 0.05, startFreq: yToFrequency(s.y - s.size / 2 + Math.random() * s.size), vol: Math.random() * vol, pan: pan - 0.2 + Math.random() * 0.4, x: s.x }, mainOut);
+                    }
+                    break;
+            }
+        });
+    };
+    
+    scheduleForExport(offlineCtx);
+
+    try {
+        const renderedBuffer = await offlineCtx.startRendering();
+        const wav = bufferToWav(renderedBuffer);
+        const blob = new Blob([new Uint8Array(wav)], { type: 'audio/wav' });
+
+        const link = d.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `minha-musica-${Date.now()}.wav`;
+        link.click();
+        URL.revokeObjectURL(link.href);
+    } catch (e) {
+        console.error('Erro ao renderizar o WAV:', e);
+        alert('Ocorreu um erro ao exportar o áudio.');
+    } finally {
+        el.loadingOverlay.classList.add('hidden');
+    }
+}
+
+function bufferToWav(buffer) {
+    const numOfChan = buffer.numberOfChannels;
+    const length = buffer.length * numOfChan * 2 + 44;
+    const bufferArr = new ArrayBuffer(length);
+    const view = new DataView(bufferArr);
+    const channels = [];
+    let i;
+    let sample;
+    let offset = 0;
+    let pos = 0;
+
+    setUint32(0x46464952); // "RIFF"
+    setUint32(length - 8); // file length - 8
+    setUint32(0x45564157); // "WAVE"
+
+    setUint32(0x20746d66); // "fmt " chunk
+    setUint32(16); // length = 16
+    setUint16(1); // PCM (uncompressed)
+    setUint16(numOfChan);
+    setUint32(buffer.sampleRate);
+    setUint32(buffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+    setUint16(numOfChan * 2); // block-align
+    setUint16(16); // 16-bit
+
+    setUint32(0x61746164); // "data" - chunk
+    setUint32(length - pos - 4); // chunk length
+
+    for (i = 0; i < buffer.numberOfChannels; i++) {
+        channels.push(buffer.getChannelData(i));
+    }
+
+    while (pos < length) {
+        for (i = 0; i < numOfChan; i++) {
+            sample = Math.max(-1, Math.min(1, channels[i][offset])); 
+            sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0; 
+            view.setInt16(pos, sample, true); 
+            pos += 2;
+        }
+        offset++; 
+    }
+
+    return bufferArr;
+
+    function setUint16(data) {
+        view.setUint16(pos, data, true);
+        pos += 2;
+    }
+
+    function setUint32(data) {
+        view.setUint32(pos, data, true);
+        pos += 4;
+    }
+}
+
+function simplify(points, tolerance) {
+    if (points.length <= 2) return points;
+    
+    let dmax = 0;
+    let index = 0;
+    const end = points.length - 1;
+    
+    for (let i = 1; i < end; i++) {
+        const d = perpendicularDistance(points[i], points[0], points[end]);
+        if (d > dmax) {
+            index = i;
+            dmax = d;
+        }
+    }
+    
+    if (dmax > tolerance) {
+        const recResults1 = simplify(points.slice(0, index + 1), tolerance);
+        const recResults2 = simplify(points.slice(index), tolerance);
+        
+        return recResults1.slice(0, recResults1.length - 1).concat(recResults2);
+    } else {
+        return [points[0], points[end]];
+    }
+}
+
+function perpendicularDistance(point, lineStart, lineEnd) {
+    let dx = lineEnd.x - lineStart.x;
+    let dy = lineEnd.y - lineStart.y;
+
+    const mag = Math.sqrt(dx * dx + dy * dy);
+    if (mag > 0) {
+        dx /= mag;
+        dy /= mag;
+    }
+
+    const pvx = point.x - lineStart.x;
+    const pvy = point.y - lineStart.y;
+
+    const pvdot = dx * pvx + dy * pvy;
+    
+    const ax = pvx - pvdot * dx;
+    const ay = pvy - pvdot * dy;
+    
+    return Math.sqrt(ax * ax + ay * ay);
+}
+
 
 // --- STARTUP ---
 d.addEventListener('DOMContentLoaded', () => {
@@ -1200,16 +1656,21 @@ d.addEventListener('DOMContentLoaded', () => {
         pcModeBtn.addEventListener('click', () => initApp('pc'));
         mobileModeBtn.addEventListener('click', () => initApp('mobile'));
     }
-     const backgroundAudio = d.getElementById('background-audio');
-     if (backgroundAudio) {
-        backgroundAudio.play().catch(error => {
-            console.log("A reprodução automática foi bloqueada. O áudio começará no primeiro clique do usuário.", error);
-            d.body.addEventListener('click', () => {
-                backgroundAudio.play();
-            }, { once: true });
-        });
-    }
+    
     const selectionContainer = d.getElementById('selection-container');
+    const backgroundAudio = d.getElementById('background-audio');
+
+    if (selectionContainer && backgroundAudio) {
+        const startAudioOnClick = () => {
+            if (backgroundAudio.paused) {
+                backgroundAudio.play().catch(error => {
+                    console.error("A reprodução do áudio falhou mesmo após o clique:", error);
+                });
+            }
+        };
+        selectionContainer.addEventListener('click', startAudioOnClick, { once: true });
+    }
+
     const appWrapper = d.getElementById('app-wrapper');
     if(selectionContainer) selectionContainer.classList.remove('hidden');
     if(appWrapper) appWrapper.classList.add('hidden');
