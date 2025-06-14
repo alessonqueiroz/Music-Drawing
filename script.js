@@ -83,7 +83,6 @@ let state = {
     isDraggingEnd: false,
     isDraggingPlayhead: false,
 };
-let baseCanvasHeight = 0;
 let clipboard = [];
 
 // --- CORE FUNCTIONS ---
@@ -116,27 +115,34 @@ function initApp(mode = 'pc') {
 
 function resizeAndRedraw() {
     const canvasWidth = MAX_DURATION_SECONDS * PIXELS_PER_SECOND;
+    const canvasHeight = el.mainCanvasArea.offsetHeight;
     
-    if (!baseCanvasHeight) {
-        baseCanvasHeight = el.mainCanvasArea.offsetHeight;
+    if(canvasHeight <= 0) {
+        setTimeout(resizeAndRedraw, 100);
+        return;
     }
-
+    
     el.canvas.width = canvasWidth;
-    el.canvas.height = baseCanvasHeight; 
+    el.canvas.height = canvasHeight;
+    el.canvasContainer.style.width = `${canvasWidth}px`;
+    el.canvasContainer.style.height = `${canvasHeight}px`;
 
+    el.yRulerCanvas.width = el.yRulerContainer.offsetWidth;
+    el.yRulerCanvas.height = canvasHeight;
+    
     el.xRulerCanvas.width = canvasWidth;
     el.xRulerCanvas.height = el.xRulerContainer.offsetHeight;
-    el.yRulerCanvas.width = el.yRulerContainer.offsetWidth;
-    el.yRulerCanvas.height = baseCanvasHeight;
 
-    handleZoom(false, true);
+    redrawAll();
 }
 
 function redrawAll() {
+    // CORREÇÃO: Limpa o canvas inteiro, independentemente do zoom.
     ctx.clearRect(0, 0, el.canvas.width, el.canvas.height);
     
     ctx.save();
-    
+    ctx.scale(state.zoomLevel, state.zoomLevel);
+
     state.composition.strokes.forEach(stroke => {
         if (stroke.points.length < 2) return;
         ctx.beginPath();
@@ -174,20 +180,19 @@ function drawRulers() {
 
     const textColor = getComputedStyle(d.documentElement).getPropertyValue('--text-dark').trim();
     const rulerFont = '9px Inter';
-    const xZoom = state.zoomLevel;
-    const yZoom = state.zoomLevel;
 
-    // X-Ruler (Time)
     xRulerCtx.fillStyle = textColor;
     xRulerCtx.font = rulerFont;
     xRulerCtx.textAlign = 'center';
     xRulerCtx.textBaseline = 'top';
 
-    const startSec = Math.floor(el.mainCanvasArea.scrollLeft / (PIXELS_PER_SECOND * xZoom));
-    const endSec = Math.ceil((el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
+    const xScroll = el.mainCanvasArea.scrollLeft;
+    const xZoom = state.zoomLevel;
+    const startSec = Math.floor(xScroll / (PIXELS_PER_SECOND * xZoom));
+    const endSec = Math.ceil((xScroll + el.mainCanvasArea.offsetWidth) / (PIXELS_PER_SECOND * xZoom));
     
     for (let sec = startSec; sec <= endSec; sec++) {
-        const xPos = sec * PIXELS_PER_SECOND * xZoom - el.mainCanvasArea.scrollLeft;
+        const xPos = (sec * PIXELS_PER_SECOND * xZoom) - xScroll;
         
         let isMajorTick = false;
         if (xZoom > 2) isMajorTick = (sec % 1 === 0);
@@ -202,32 +207,44 @@ function drawRulers() {
         }
     }
 
-    // Y-Ruler (Frequency)
     yRulerCtx.fillStyle = textColor;
     yRulerCtx.font = rulerFont;
     yRulerCtx.textAlign = 'right';
     yRulerCtx.textBaseline = 'middle';
 
     const yScroll = el.mainCanvasArea.scrollTop;
+    const yZoom = state.zoomLevel;
 
     let minorStep, majorStep;
-    if (yZoom < 0.75) { minorStep = 200; majorStep = 400;
-    } else if (yZoom < 1.5) { minorStep = 100; majorStep = 200;
-    } else if (yZoom < 3.0) { minorStep = 50; majorStep = 100;
-    } else { minorStep = 20; majorStep = 100; }
+    if (yZoom < 0.75) {
+        minorStep = 200;
+        majorStep = 400;
+    } else if (yZoom < 1.5) {
+        minorStep = 100;
+        majorStep = 200;
+    } else if (yZoom < 3.0) {
+        minorStep = 50;
+        majorStep = 100;
+    } else { 
+        minorStep = 20;
+        majorStep = 100;
+    }
 
     const drawnLabels = []; 
     const loopIncrement = minorStep / 2;
 
     for (let freq = FREQ_MIN; freq <= FREQ_MAX; freq += loopIncrement) {
+        
         let isMajor = freq % majorStep === 0;
         let isMinor = freq % minorStep === 0;
 
         if (!isMajor && !isMinor) continue;
 
-        const yPos = yFromFrequency(freq) * yZoom - yScroll;
-        if (yPos < -10 || yPos > el.mainCanvasArea.offsetHeight + 10) continue;
+        const yPos = (yFromFrequency(freq) * yZoom) - yScroll;
+
+        if (yPos < -10 || yPos > el.yRulerCanvas.height + 10) continue;
         
+
         if (isMajor) {
             let collision = false;
             for (const drawnY of drawnLabels) {
@@ -296,19 +313,6 @@ function setupEventListeners() {
     el.importProjectBtn.addEventListener('click', () => el.musdrImporter.click());
     el.musdrImporter.addEventListener('change', importProject);
 
-    el.exportBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const dropdownContainer = el.exportBtn.closest('.dropdown');
-        if (!dropdownContainer) return;
-        
-        const dropdownContent = dropdownContainer.querySelector('.dropdown-content');
-        if (!dropdownContent) return;
-
-        const isVisible = dropdownContent.style.display === 'block';
-        document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
-        dropdownContent.style.display = isVisible ? 'none' : 'block';
-    });
-
     el.exportJpgBtn.addEventListener('click', exportJpg);
     el.exportPdfBtn.addEventListener('click', exportPdf);
     el.exportWavBtn.addEventListener('click', exportWav);
@@ -331,12 +335,6 @@ function setupEventListeners() {
     window.addEventListener('touchmove', handlePlayheadDrag, { passive: false });
     window.addEventListener('touchend', stopPlayheadDrag);
     
-    window.addEventListener('click', (e) => {
-        if (!e.target.closest('.dropdown')) {
-            document.querySelectorAll('.dropdown-content').forEach(d => d.style.display = 'none');
-        }
-    });
-
     window.addEventListener('keydown', e => {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
@@ -373,14 +371,17 @@ function setupEventListeners() {
     });
 }
 
-
+// CORREÇÃO: Função de cálculo de posição do evento
 function getEventPos(e) {
-    const rect = el.mainCanvasArea.getBoundingClientRect();
+    const rect = el.canvas.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    const x = (clientX - rect.left + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
-    const y = (clientY - rect.top + el.mainCanvasArea.scrollTop) / state.zoomLevel;
+    const xOnScaledElement = clientX - rect.left;
+    const yOnScaledElement = clientY - rect.top;
+
+    const x = xOnScaledElement / state.zoomLevel;
+    const y = yOnScaledElement / state.zoomLevel;
 
     return { x, y };
 }
@@ -566,30 +567,29 @@ function performAction(e) {
     }
 }
 
-function handleZoom(zoomIn, isForced = false) {
-    let newZoom = state.zoomLevel;
-    if (!isForced) {
-        const oldZoom = state.zoomLevel;
-        newZoom = oldZoom + (zoomIn ? ZOOM_STEP : -ZOOM_STEP) * oldZoom;
-        newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
+function handleZoom(zoomIn) {
+    const oldZoom = state.zoomLevel;
+    let newZoom = oldZoom + (zoomIn ? ZOOM_STEP : -ZOOM_STEP) * oldZoom;
+    newZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom));
 
-        if (newZoom === oldZoom) return;
-    }
+    if (newZoom === oldZoom) return;
+
+    const viewCenterX = el.mainCanvasArea.scrollLeft + el.mainCanvasArea.offsetWidth / 2;
+    const viewCenterY = el.mainCanvasArea.scrollTop + el.mainCanvasArea.offsetHeight / 2;
+
+    const pointX = viewCenterX / oldZoom;
+    const pointY = viewCenterY / oldZoom;
     
     state.zoomLevel = newZoom;
     
-    const newCanvasWidth = el.canvas.width * state.zoomLevel;
-    const newCanvasHeight = el.canvas.height * state.zoomLevel;
-    
-    el.canvasContainer.style.width = `${newCanvasWidth}px`;
-    el.canvasContainer.style.height = `${newCanvasHeight}px`;
+    const newScrollX = pointX * newZoom - el.mainCanvasArea.offsetWidth / 2;
+    const newScrollY = pointY * newZoom - el.mainCanvasArea.offsetHeight / 2;
 
-    el.yRulerContainer.style.height = `${newCanvasHeight}px`;
-    el.yRulerCanvas.height = newCanvasHeight;
-    
+    el.mainCanvasArea.scrollLeft = newScrollX;
+    el.mainCanvasArea.scrollTop = newScrollY;
+
     redrawAll();
 }
-
 
 function handleTimelineClick(e) {
     if (state.isPlaying) {
@@ -599,9 +599,9 @@ function handleTimelineClick(e) {
     const rect = el.xRulerCanvas.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
 
-    const canvasX = (clickX + el.mainCanvasArea.scrollLeft);
+    const canvasX = (clickX + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
     
-    let newStartTime = canvasX / (PIXELS_PER_SECOND * state.zoomLevel);
+    let newStartTime = canvasX / PIXELS_PER_SECOND;
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
     state.playbackStartTime = newStartTime;
@@ -632,9 +632,9 @@ function handlePlayheadDrag(e) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const xPosOnCanvasArea = clientX - rect.left;
 
-    const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft);
+    const canvasX = (xPosOnCanvasArea + el.mainCanvasArea.scrollLeft) / state.zoomLevel;
     
-    let newStartTime = canvasX / (PIXELS_PER_SECOND * state.zoomLevel);
+    let newStartTime = canvasX / PIXELS_PER_SECOND;
     newStartTime = Math.max(0, Math.min(newStartTime, MAX_DURATION_SECONDS));
 
     state.playbackStartTime = newStartTime;
@@ -650,7 +650,7 @@ function stopPlayheadDrag() {
 }
 
 function updatePlayheadPosition() {
-    const playheadX = state.playbackStartTime * PIXELS_PER_SECOND * state.zoomLevel;
+    const playheadX = state.playbackStartTime * PIXELS_PER_SECOND;
     el.playhead.style.transform = `translateX(${playheadX}px)`;
     el.playhead.classList.remove('hidden');
 }
@@ -684,6 +684,7 @@ function placeSymbol(pos) {
 
 function drawSymbol(s) {
     ctx.save();
+    ctx.scale(state.zoomLevel, state.zoomLevel);
     ctx.fillStyle = s.color;
     ctx.strokeStyle = s.color;
     const size = s.size;
@@ -833,6 +834,7 @@ function drawMarquee() {
     const selectionColor = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
 
     ctx.save();
+    ctx.scale(state.zoomLevel, state.zoomLevel);
     ctx.fillStyle = selectionColor.replace(/[^,]+(?=\))/, '0.2');
     ctx.strokeStyle = selectionColor;
     ctx.lineWidth = 1;
@@ -845,6 +847,7 @@ function drawSelectionIndicator(element) {
     const box = getElementBoundingBox(element);
     if (box) {
         ctx.save();
+        ctx.scale(state.zoomLevel, state.zoomLevel);
         ctx.strokeStyle = getComputedStyle(d.documentElement).getPropertyValue('--selection-glow').trim();
         ctx.lineWidth = 1.5;
         ctx.setLineDash([5, 5]);
@@ -1368,7 +1371,7 @@ function handleExportDrag(e) {
     const rect = el.xRulerContainer.getBoundingClientRect();
     const xPosOnRuler = e.clientX - rect.left;
     
-    const time = (xPosOnRuler + el.mainCanvasArea.scrollLeft) / (PIXELS_PER_SECOND * state.zoomLevel);
+    const time = ((el.mainCanvasArea.scrollLeft / state.zoomLevel) + (xPosOnRuler / state.zoomLevel)) / PIXELS_PER_SECOND;
     
     if (state.isDraggingStart) {
         state.exportStartTime = Math.max(0, Math.min(time, state.exportEndTime - 0.1)); 
@@ -1389,8 +1392,8 @@ function updateExportSelectionVisuals() {
     el.exportStartHandle.style.left = `${startHandlePos}px`;
     el.exportEndHandle.style.left = `${endHandlePos}px`;
 
-    const overlayStart = state.exportStartTime * PIXELS_PER_SECOND * zoom - scroll;
-    const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND * zoom - scroll;
+    const overlayStart = state.exportStartTime * PIXELS_PER_SECOND;
+    const overlayEnd = state.exportEndTime * PIXELS_PER_SECOND;
     
     el.exportSelectionOverlay.style.left = `${overlayStart}px`;
     el.exportSelectionOverlay.style.width = `${overlayEnd - overlayStart}px`;
